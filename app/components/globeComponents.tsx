@@ -57,10 +57,10 @@ export default function GlobeComponent({
 
                 // New layer: pilots as points
                 pointsData={pilotData}
-                pointLabel={(d: Pilot) => ``}
-                pointLat={(d: Pilot) => d.latitude}
-                pointLng={(d: Pilot) => d.longitude}
-                pointAltitude={(d: Pilot) => 0} // normalize to globe radius
+                pointLabel={(d: any) => ``}
+                pointLat={(d: any) => d.latitude}
+                pointLng={(d: any) => d.longitude}
+                pointAltitude={(d: any) => 0} // normalize to globe radius
                 pointColor={() => "#007900"} // or color by type/rating
                 pointRadius={0.04}
                 onPointHover={(pilot) => setHoveredPilot(pilot ?? null)}
@@ -69,20 +69,20 @@ export default function GlobeComponent({
             {/* Event Tooltip Card */}
             {hoveredArc && (
                 <div
-                style={{
-                    position: 'fixed',
-                    top: mousePos.y + 10,
-                    left: mousePos.x + 10,
-                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                    color: '#fff',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    pointerEvents: 'none',
-                    zIndex: 9999,
-                    maxWidth: '280px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                    fontFamily: 'sans-serif'
-                }}
+                    style={{
+                        position: 'fixed',
+                        top: mousePos.y + 10,
+                        left: mousePos.x + 10,
+                        backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                        color: '#fff',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        pointerEvents: 'none',
+                        zIndex: 9999,
+                        maxWidth: '280px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                        fontFamily: 'sans-serif'
+                    }}
                 >
                     {/* Banner Image */}
                     {hoveredArc.banner && (

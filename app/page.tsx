@@ -466,7 +466,7 @@ export default function Home() {
                 alignItems: 'center',
             }}>
                 <span style={{ fontWeight: 'bold' }}>VATSIM EVENTS 3D MAP</span>
-                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>by Miggle</span>
+                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Version 1 | by Miggle | <a href="https://github.com/RyanLee355/VatsimEventsMap">GitHub Repo.</a></span>
             </div>
 
             {/* Bottom Right Settings */}
