@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import GlobeComponent from "./globeComponents";
+import GlobeComponent from "./components/globeComponents";
 import airportsDb from "@/app/data/airports.json";
 
-type Route = {
+export type Route = {
     startLat: number;
     startLng: number;
     endLat: number;
@@ -19,7 +19,7 @@ type Route = {
     endIcao: string;
 };
 
-type Ring = {
+export type Ring = {
     lat: number;
     lng: number;
     color: string[];
@@ -40,6 +40,98 @@ type DateCategory =
     | 'day3'
     | 'day4to5'
     | 'day6plus';
+
+type NetworkData = {
+    general: GeneralInfo;
+    pilots: Pilot[];
+    controllers: Controller[];
+    atis: Atis[];
+    servers: Server[];
+};
+
+type GeneralInfo = {
+    version: number;
+    reload: number;
+    update: string; // ISO timestamp string
+};
+
+export type Pilot = {
+    cid: number;
+    name: string;
+    callsign: string;
+    server: string;
+
+    pilot_rating: number;
+    military_rating: number;
+
+    latitude: number;
+    longitude: number;
+    altitude: number;
+    groundspeed: number;
+    heading: number;
+    transponder: string;
+
+    qnh_i_hg: number;
+    qnh_mb: number;
+
+    flight_plan: FlightPlan | null;
+
+    logon_time: string;
+    last_updated: string;
+};
+
+export type FlightPlan = {
+    flight_rules: string;
+    aircraft: string;
+    aircraft_faa: string;
+
+    departure: string;
+    arrival: string;
+    alternate: string;
+
+    cruise_tas: number;
+    altitude: string;
+
+    route: string;
+    remarks: string;
+
+    enroute_time: string;
+    fuel_time: string;
+};
+
+export type Controller = {
+    cid: number;
+    name: string;
+    callsign: string;
+    frequency: string;
+
+    facility: number;
+    rating: number;
+    server: string;
+
+    visual_range: number;
+    text_atis: string | null;
+
+    logon_time: string;
+    last_updated: string;
+};
+
+export type Atis = {
+    cid: number;
+    callsign: string;
+    frequency: string;
+    facility: number;
+
+    text_atis: string[];
+    logon_time: string;
+    last_updated: string;
+};
+
+export type Server = {
+    ident: string;
+    hostname: string;
+    location: string;
+};
 
 function eventToRoutesAndRings(
     event: {
@@ -230,6 +322,9 @@ function dedupeEventsByEarliest(events: any[]) {
 export default function Home() {
     const [routes, setRoutes] = useState<Route[]>([]);
     const [rings, setRings] = useState<Ring[]>([]);
+    const [pilotData, setPilotData] = useState<Pilot[]>([]);
+    const [pilotToggle, setPilotToggle] = useState<boolean>(true);
+    const [eventPilotToggle, setEventPilotToggle] = useState<boolean>(false);
 
     const [enabledCategories, setEnabledCategories] = useState<Record<DateCategory, boolean>>({
         ongoing: true,
@@ -262,14 +357,28 @@ export default function Home() {
             setRoutes(allRoutes);
             setRings(allRings);
         }
-
         fetchEvents();
     }, []);
 
+    useEffect(() => {
+        async function fetchNetworkData() {
+            const res = await fetch("/api/vatsim/data", {
+                next: { revalidate: 15 }
+            });
+
+            const json = await res.json();
+
+            // Process network data if needed
+
+            setPilotData(json.pilots);
+        }
+        fetchNetworkData();
+    }, []);
+
+    // Filter routes and rings based on enabled time categories
     const filteredRoutes = routes.filter(
         r => enabledCategories[r.category]
     );
-
     const filteredRings = rings.filter(
         r => enabledCategories[r.category]
     );
@@ -293,10 +402,51 @@ export default function Home() {
             label: icao
         }));
 
+    // Filter pilots by those only going to/from a CURRENT ONGOING EVENT
+    // 1. Get all ICAOs of airports with ongoing events
+    const ongoingEventIcaos = new Set<string>(
+        filteredRings
+            .filter(r => r.category === 'ongoing')
+            .map(r => r.icao)
+    );
+
+    // 2. Include start/end of routes that are ongoing
+    filteredRoutes
+        .filter(r => r.category === 'ongoing')
+        .forEach(r => {
+            ongoingEventIcaos.add(r.startIcao);
+            ongoingEventIcaos.add(r.endIcao);
+        });
+
+    // 3. Then filter pilots
+    const pilotDataFiltered = pilotData.filter(pilot => {
+        const fp = pilot.flight_plan;
+        if (!fp) return false;
+
+        // If eventPilotToggle is off, show all pilots
+        if (!eventPilotToggle) return true;
+
+        // Show pilots whose departure or arrival is in an ongoing event airport
+        return ongoingEventIcaos.has(fp.departure) || ongoingEventIcaos.has(fp.arrival);
+    });
+
+    const togglePilots = () => {
+        setPilotToggle(prev => !prev);
+    };
+
+    const togglePilotsEvent = () => {
+        setEventPilotToggle(prev => !prev);
+    };
+
     return (
         <div style={{fontFamily: 'monospace'}}>
             <main>
-                <GlobeComponent routes={filteredRoutes} rings={filteredRings} airportPoints={airportPoints} />
+                <GlobeComponent
+                    routes={filteredRoutes}
+                    rings={filteredRings}
+                    airportPoints={airportPoints}
+                    pilotData={pilotToggle ? pilotDataFiltered : []}
+                />
             </main>
 
             {/* Title */}
@@ -315,11 +465,11 @@ export default function Home() {
                 flexDirection: 'column',
                 alignItems: 'center',
             }}>
-                <span style={{ fontWeight: 'bold' }}>VATSIM EVENTS MAP</span>
+                <span style={{ fontWeight: 'bold' }}>VATSIM EVENTS 3D MAP</span>
                 <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>by Miggle</span>
             </div>
 
-            {/* Legend container */}
+            {/* Bottom Right Settings */}
             <div
                 style={{
                     position: 'fixed',
@@ -327,60 +477,99 @@ export default function Home() {
                     right: '20px',
                     display: 'flex',
                     flexDirection: 'column',
-                    padding: '12px',
                     zIndex: 10000,
-                    borderRadius: '8px',
-
-                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
                 }}
             >
-                <span style={{ fontWeight: 'bold'}}>Event Dates</span>
-                
-                <span style={{ fontSize: '0.75rem', color: '#ccc', textAlign: 'center' }}>(Click to toggle)</span>
-
-                <div style={{ marginTop: '8px' }}>
-                {[
-                    ['ongoing', 'Ongoing', '#00ff00'],
-                    ['today', 'Today', '#ffcc00'],
-                    ['tomorrow', 'Tomorrow', '#ff8800'],
-                    ['day2', 'In 2 Days', '#ff4444'],
-                    ['day3', 'In 3 Days', '#ff00ff'],
-                    ['day4to5', 'In 4–5 Days', '#8800ff'],
-                    ['day6plus', 'In 6+ Days', '#00f']
-                ].map(([key, label, color]) => {
-                    const enabled = enabledCategories[key as DateCategory];
-
-                    return (
-                        <div
-                            key={key}
-                            onClick={() => toggleCategory(key as DateCategory)}
-                            style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            marginBottom: '6px',
+                {/* Toggles */}
+                <div style={{ marginBottom: '12px' }}>
+                    {/* Pilots toggle */}
+                    <div
+                        onClick={() => togglePilots()}
+                        style={{
                             cursor: 'pointer',
-                            opacity: enabled ? 1 : 0.35,
-                            transition: 'opacity 0.2s ease'
-                            }}
-                        >
-                            <span
-                                style={{
-                                    width: '16px',
-                                    height: '16px',
-                                    backgroundColor: color,
-                                    borderRadius: '3px',
-                                    border: enabled ? 'none' : '1px solid #666',
-                                    boxSizing: 'border-box'
-                                }}
-                            />
-                            <span style={{ fontSize: '0.8rem' }}>{label}</span>
-                        </div>
-                    );
-                })}
+                            backgroundColor: 'rgba(0,0,0,0.6)',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            color: 'white',
+                        }}
+                    >
+                        <span>{pilotToggle ? '> Showing Pilots' : '> Hiding Pilots'}</span>
+                    </div>
+                    {/* Event Pilots toggle */}
+                    <div
+                        onClick={() => togglePilotsEvent()}
+                        style={{
+                            cursor: 'pointer',
+                            backgroundColor: 'rgba(0,0,0,0.6)',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            color: 'white',
+                        }}
+                    >
+                        <span>{eventPilotToggle ? '> Showing only Ongoing Event Pilots' : '> Showing All Pilots'}</span>
+                    </div>
                 </div>
 
+
+                {/* Legend container */}
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                    }}
+                >
+                    <span style={{ fontWeight: 'bold'}}>Event Dates</span>
+                    
+                    <span style={{ fontSize: '0.75rem', color: '#ccc' }}>(Click to toggle)</span>
+
+                    <div style={{ marginTop: '8px' }}>
+                    {[
+                        ['ongoing', 'Ongoing', '#00ff00'],
+                        ['today', 'Today', '#ffcc00'],
+                        ['tomorrow', 'Tomorrow', '#ff8800'],
+                        ['day2', 'In 2 Days', '#ff4444'],
+                        ['day3', 'In 3 Days', '#ff00ff'],
+                        ['day4to5', 'In 4–5 Days', '#8800ff'],
+                        ['day6plus', 'In 6+ Days', '#00f']
+                    ].map(([key, label, color]) => {
+                        const enabled = enabledCategories[key as DateCategory];
+
+                        return (
+                            <div
+                                key={key}
+                                onClick={() => toggleCategory(key as DateCategory)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    marginBottom: '6px',
+                                    cursor: 'pointer',
+                                    opacity: enabled ? 1 : 0.35,
+                                    transition: 'opacity 0.2s ease'
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        width: '16px',
+                                        height: '16px',
+                                        backgroundColor: color,
+                                        borderRadius: '3px',
+                                        border: enabled ? 'none' : '1px solid #666',
+                                        boxSizing: 'border-box'
+                                    }}
+                                />
+                                <span style={{ fontSize: '0.8rem' }}>{label}</span>
+                            </div>
+                        );
+                    })}
+                    </div>
+
+                </div>
             </div>
+
 
         </div>
     );

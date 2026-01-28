@@ -1,21 +1,24 @@
 'use client';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-
+import { Pilot, Ring, Route } from '../page';
 // Only load react-globe.gl on the client
 const Globe = dynamic(() => import('react-globe.gl'), { ssr: false });
 
 export default function GlobeComponent({
     routes,
     rings,
-    airportPoints
+    airportPoints,
+    pilotData,
 }: {
-    routes: any[];
-    rings: any[];
+    routes: Route[];
+    rings: Ring[];
     airportPoints: any[];
+    pilotData: Pilot[];
 }) {
-    const [hoveredArc, setHoveredArc] = useState<any | null>(null);
     const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [hoveredArc, setHoveredArc] = useState<any | null>(null);
+    const [hoveredPilot, setHoveredPilot] = useState<any | null>(null);
 
     return (
         <div
@@ -51,9 +54,19 @@ export default function GlobeComponent({
                 labelText={(d: any) => d.label}
                 labelSize={0.15}
                 labelAltitude={0.0}
+
+                // New layer: pilots as points
+                pointsData={pilotData}
+                pointLabel={(d: Pilot) => ``}
+                pointLat={(d: Pilot) => d.latitude}
+                pointLng={(d: Pilot) => d.longitude}
+                pointAltitude={(d: Pilot) => 0} // normalize to globe radius
+                pointColor={() => "#007900"} // or color by type/rating
+                pointRadius={0.04}
+                onPointHover={(pilot) => setHoveredPilot(pilot ?? null)}
             />
 
-            {/* Tooltip Card */}
+            {/* Event Tooltip Card */}
             {hoveredArc && (
                 <div
                 style={{
@@ -138,6 +151,38 @@ export default function GlobeComponent({
 
                 </div>
             )}
+
+            {/* Pilot Tooltip */}
+            {hoveredPilot && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: mousePos.y + 10,
+                        left: mousePos.x + 10,
+                        backgroundColor: 'rgba(0,0,0,0.85)',
+                        color: '#fff',
+                        padding: '8px',
+                        borderRadius: '6px',
+                        pointerEvents: 'none',
+                        zIndex: 9999,
+                        maxWidth: '220px',
+                        fontFamily: 'sans-serif',
+                        fontSize: '0.85rem',
+                    }}
+                >
+                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                        {hoveredPilot.callsign} — {hoveredPilot.name}
+                    </div>
+                    {/* <div>Latitude: {hoveredPilot.latitude.toFixed(4)}</div>
+                    <div>Longitude: {hoveredPilot.longitude.toFixed(4)}</div> */}
+                    <div>ALT: {hoveredPilot.altitude} ft</div>
+                    <div>GS: {hoveredPilot.groundspeed} kt</div>
+                    {hoveredPilot.flight_plan && (
+                        <div>Route: {hoveredPilot.flight_plan.departure} → {hoveredPilot.flight_plan.arrival}</div>
+                    )}
+                </div>
+            )}
+
         </div>
     );
 }
