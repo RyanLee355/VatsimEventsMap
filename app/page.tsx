@@ -1,8 +1,7 @@
 "use client";
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import GlobeComponent from "./globeComponents";
 import airportsDb from "@/app/data/airports.json";
-import { Range } from 'react-range';
 
 type Route = {
     startLat: number;
@@ -27,7 +26,7 @@ type Ring = {
     eventName: string;
     startTime: Date;
     endTime: Date;
-    radius?: number; // optional, can animate
+    radius?: number;
     banner: string | null;
     category: DateCategory;
     icao: string;
@@ -118,8 +117,6 @@ function eventToRoutesAndRings(
             radius: 100000, // in meters, adjust as needed
             banner: event.banner,
         });
-
-        // return { routes, rings };
     }
 
     if (event.airports.length === 1) {
@@ -127,7 +124,7 @@ function eventToRoutesAndRings(
         const airport = airportsDb[a];
         if (!airport) return { routes, rings };
 
-        const offset = 0.05; // degrees, tweak visually
+        const offset = 0.05; // Lat/Long Degs. offset for visual separation
 
         routes.push({
             startIcao: a,
@@ -184,7 +181,6 @@ function eventToRoutesAndRings(
         }
     }
 
-
     return { routes, rings };
 }
 
@@ -221,7 +217,7 @@ function dedupeEventsByEarliest(events: any[]) {
             const existing = map.get(key);
             const existingStart = new Date(existing.start_time);
 
-            // keep the EARLIEST one only
+            // Keeps the EARLIEST one only
             if (start < existingStart) {
                 map.set(key, event);
             }
@@ -251,18 +247,6 @@ export default function Home() {
             [cat]: !prev[cat]
         }));
     };
-
-    const [dateRange, setDateRange] = useState<[Date, Date]>(() => {
-        const today = new Date();
-        const weekFromNow = new Date();
-        weekFromNow.setDate(today.getDate() + 7);
-        return [today, weekFromNow];
-    });
-
-    const minDate = new Date();
-    const maxDate = new Date();
-    maxDate.setMonth(maxDate.getMonth() + 3); // 3 months max
-    const sliderValues = dateRange.map(d => d.getTime());
 
     useEffect(() => {
         async function fetchEvents() {
@@ -335,7 +319,6 @@ export default function Home() {
                 <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>by Miggle</span>
             </div>
 
-
             {/* Legend container */}
             <div
                 style={{
@@ -381,7 +364,6 @@ export default function Home() {
                             transition: 'opacity 0.2s ease'
                             }}
                         >
-                            {/* Color box = checkbox */}
                             <span
                                 style={{
                                     width: '16px',

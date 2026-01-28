@@ -1,8 +1,7 @@
 'use client';
-
 import { useState } from 'react';
-// import Globe from 'react-globe.gl';
 import dynamic from 'next/dynamic';
+
 // Only load react-globe.gl on the client
 const Globe = dynamic(() => import('react-globe.gl'), { ssr: false });
 
@@ -87,9 +86,7 @@ export default function GlobeComponent({
                     )}
 
                     {/* Tags */}
-                    {/* 1. Tag showing event date (e.g., "Today" or "Tomorrow" or "In X Days") */}
-
-                    {/* Date Tag */}
+                    {/* 1. Date Tag */}
                     {hoveredArc.startTime && (() => {
                         const now = new Date();
                         const startDate = new Date(hoveredArc.startTime);
