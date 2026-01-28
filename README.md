@@ -9,6 +9,7 @@ This map serves as an alternate to the 2D official vatsim events map. It offers 
     - Includes scheduled event times, dates, and ICAOs.
 - Filters (Time-based)
 - Live pilot display w/ event filter
+- Day/Night Toggle
 
 ![Version 1 of Vatsim Events 3D Map](./public/images/vatsim_events_map_screenshot1.png)
 
@@ -27,6 +28,7 @@ Open [http://localhost:3000](http://localhost:3000) to view the website.
 ## Known Issues
 - **Missing Events/Airports**: Some airport ICAOs are not registered and will fail to show on the map. Notably, smaller airports that may not have been documented yet on TGAD. (e.g. KTRI, KBKW, KCRW)
 - **Reduced Performance**: Signficiantly reduced performance with many options enabled (difficult to solve, derived from limitations on react-globe).
+- **Map Resolution**: Higher map resolution is yet to be explored due to R-G utilising a equirectangular projection, contrary to a interactive map (i.e. OpenStreetMap)
 
 ## Acknowledgements
 - [react-globe.gl](https://github.com/vasturiano/react-globe.gl) - 3D Globe Model Visualiser

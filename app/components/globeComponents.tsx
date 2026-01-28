@@ -10,11 +10,13 @@ export default function GlobeComponent({
     rings,
     airportPoints,
     pilotData,
+    dayNightMode,
 }: {
     routes: Route[];
     rings: Ring[];
     airportPoints: any[];
     pilotData: Pilot[];
+    dayNightMode: boolean;
 }) {
     const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [hoveredArc, setHoveredArc] = useState<any | null>(null);
@@ -27,7 +29,13 @@ export default function GlobeComponent({
             style={{width: "100vw", height: "100vh"}}
         >
             <Globe
-                globeImageUrl="//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg"
+                globeImageUrl={dayNightMode ?
+                    "//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg"
+                    :
+                    "/textures/2k_earth_daymap.jpg"
+                }
+
+                // globeImageUrl="//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg"
                 // globeImageUrl="/textures/8k_earth_nightmap.jpg"
                 // globeImageUrl="/textures/2k_earth_daymap.jpg"
                 

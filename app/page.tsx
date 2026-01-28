@@ -325,6 +325,7 @@ export default function Home() {
     const [pilotData, setPilotData] = useState<Pilot[]>([]);
     const [pilotToggle, setPilotToggle] = useState<boolean>(true);
     const [eventPilotToggle, setEventPilotToggle] = useState<boolean>(false);
+    const [dayNightToggle, setDayNightToggle] = useState<boolean>(true);
 
     const [enabledCategories, setEnabledCategories] = useState<Record<DateCategory, boolean>>({
         ongoing: true,
@@ -438,6 +439,10 @@ export default function Home() {
         setEventPilotToggle(prev => !prev);
     };
 
+    const toggleDayNight = () => {
+        setDayNightToggle(prev => !prev);
+    }
+
     return (
         <div style={{fontFamily: 'monospace'}}>
             <main>
@@ -446,6 +451,7 @@ export default function Home() {
                     rings={filteredRings}
                     airportPoints={airportPoints}
                     pilotData={pilotToggle ? pilotDataFiltered : []}
+                    dayNightMode={dayNightToggle}
                 />
             </main>
 
@@ -481,7 +487,7 @@ export default function Home() {
                 }}
             >
                 {/* Toggles */}
-                <div style={{ marginBottom: '12px' }}>
+                <div style={{ marginBottom: '12px', gap: '8px', display: 'flex', flexDirection: 'column' }}>
                     {/* Pilots toggle */}
                     <div
                         onClick={() => togglePilots()}
@@ -507,6 +513,19 @@ export default function Home() {
                         }}
                     >
                         <span>{eventPilotToggle ? '> Showing only Ongoing Event Pilots' : '> Showing All Pilots'}</span>
+                    </div>
+                    {/* Day/Night toggle */}
+                    <div
+                        onClick={() => toggleDayNight()}
+                        style={{
+                            cursor: 'pointer',
+                            backgroundColor: 'rgba(0,0,0,0.6)',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            color: 'white',
+                        }}
+                    >
+                        <span>{dayNightToggle ? '> Night Mode' : '> Day Mode'}</span>
                     </div>
                 </div>
 
