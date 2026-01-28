@@ -1,65 +1,405 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect, use } from "react";
+import GlobeComponent from "./globeComponents";
+import airportsDb from "@/app/data/airports.json";
+import { Range } from 'react-range';
+
+type Route = {
+    startLat: number;
+    startLng: number;
+    endLat: number;
+    endLng: number;
+    color: string[];
+    eventName: string;
+    startTime: Date;
+    endTime: Date;
+    banner: string | null;
+    airportsInvolved: string[];
+    category: DateCategory;
+    startIcao: string;
+    endIcao: string;
+};
+
+type Ring = {
+    lat: number;
+    lng: number;
+    color: string[];
+    eventName: string;
+    startTime: Date;
+    endTime: Date;
+    radius?: number; // optional, can animate
+    banner: string | null;
+    category: DateCategory;
+    icao: string;
+};
+
+type DateCategory =
+    | 'ongoing'
+    | 'today'
+    | 'tomorrow'
+    | 'day2'
+    | 'day3'
+    | 'day4to5'
+    | 'day6plus';
+
+function eventToRoutesAndRings(
+    event: {
+        airports: { icao: string }[];
+        name: string;
+        start_time: string;
+        end_time: string;
+        banner: string | null;
+    },
+    airportsDb: { [icao: string]: { lat: number; lng: number; name: string } }
+): { routes: Route[]; rings: Ring[] } {
+    const routes: Route[] = [];
+    const rings: Ring[] = [];
+
+    if (!event.airports || event.airports.length === 0) return { routes, rings };
+        const allIcaosWithNames = event.airports.map((a) => {
+        const airport = airportsDb[a.icao];
+        return airport ? `${airport.name} - (${a.icao})` : a.icao;
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const getColorForEvent = (startTime: Date, endTime: Date) => {
+        const now = new Date();
+        if (now >= startTime && now <= endTime) return ["#00ff00", "#00ff00"]; // ongoing
+        const eventDay = new Date(startTime);
+        eventDay.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((eventDay.getTime() - today.getTime()) / (1000*60*60*24));
+        if (diffDays <= 0) return ["#cea500", "#cea500"];
+        if (diffDays === 1) return ["#c96b00", "#c96b00"];
+        if (diffDays === 2) return ["#be3333", "#be3333"];
+        if (diffDays === 3) return ["#ff00ff91", "#ff00ff91"];
+        if (diffDays <= 5) return ["#8800ff", "#8800ff"];
+        return ["#00f", "#0ff"];
+    };
+
+    function getEventDateCategory(startTime: Date, endTime: Date): DateCategory {
+        const now = new Date();
+
+        if (now >= startTime && now <= endTime) return 'ongoing';
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        const eventDay = new Date(startTime);
+        eventDay.setHours(0,0,0,0);
+
+        const diffDays = Math.round(
+            (eventDay.getTime() - today.getTime()) / (1000*60*60*24)
+        );
+
+        if (diffDays <= 0) return 'today';
+        if (diffDays === 1) return 'tomorrow';
+        if (diffDays === 2) return 'day2';
+        if (diffDays === 3) return 'day3';
+        if (diffDays <= 5) return 'day4to5';
+        return 'day6plus';
+    }
+
+    if (event.airports.length === 1) {
+        const a = event.airports[0].icao;
+        const airport = airportsDb[a];
+        if (!airport) return { routes, rings };
+
+        rings.push({
+            icao: a,
+            lat: airport.lat,
+            lng: airport.lng,
+            color: getColorForEvent(new Date(event.start_time), new Date(event.end_time)),
+            category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
+            eventName: event.name,
+            startTime: new Date(event.start_time),
+            endTime: new Date(event.end_time),
+            radius: 100000, // in meters, adjust as needed
+            banner: event.banner,
+        });
+
+        // return { routes, rings };
+    }
+
+    if (event.airports.length === 1) {
+        const a = event.airports[0].icao;
+        const airport = airportsDb[a];
+        if (!airport) return { routes, rings };
+
+        const offset = 0.05; // degrees, tweak visually
+
+        routes.push({
+            startIcao: a,
+            endIcao: a,
+            startLat: airport.lat,
+            startLng: airport.lng,
+            endLat: airport.lat,
+            endLng: airport.lng + offset,
+            color: getColorForEvent(
+                new Date(event.start_time),
+                new Date(event.end_time)
+            ),
+            category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
+            eventName: event.name,
+            startTime: new Date(event.start_time),
+            endTime: new Date(event.end_time),
+            banner: event.banner,
+            airportsInvolved: [`${airport.name} - (${a})`],
+        });
+
+        return { routes, rings };
+    }
+
+
+    const seenPairs = new Set<string>();
+
+    for (let i = 0; i < event.airports.length; i++) {
+        for (let j = i+1; j < event.airports.length; j++) {
+            const a1 = event.airports[i].icao;
+            const a2 = event.airports[j].icao;
+            const pairKey = [a1,a2].sort().join('-');
+            if (seenPairs.has(pairKey)) continue;
+            seenPairs.add(pairKey);
+
+            const p1 = airportsDb[a1];
+            const p2 = airportsDb[a2];
+            if (!p1 || !p2) continue;
+
+            routes.push({
+                startIcao: a1,
+                endIcao: a2,
+                startLat: p1.lat,
+                startLng: p1.lng,
+                endLat: p2.lat,
+                endLng: p2.lng,
+                color: getColorForEvent(new Date(event.start_time), new Date(event.end_time)),
+                category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
+                eventName: event.name,
+                startTime: new Date(event.start_time),
+                endTime: new Date(event.end_time),
+                banner: event.banner,
+                airportsInvolved: allIcaosWithNames,
+            });
+        }
+    }
+
+
+    return { routes, rings };
+}
+
+function buildRoutesAndRings(events: any[], airportsDb: any) {
+    const allRoutes: Route[] = [];
+    const allRings: Ring[] = [];
+
+    events.forEach(event => {
+        const { routes, rings } = eventToRoutesAndRings(event, airportsDb);
+        allRoutes.push(...routes);
+        allRings.push(...rings);
+    });
+
+    return { allRoutes, allRings };
+}
+
+function dedupeEventsByEarliest(events: any[]) {
+    const map = new Map<string, any>();
+
+    for (const event of events) {
+        if (!event.airports || event.airports.length === 0) continue;
+
+        const airportKey = event.airports
+            .map((a: any) => a.icao)
+            .sort()
+            .join('-');
+
+        const key = `${airportKey}|${event.name}`;
+        const start = new Date(event.start_time);
+
+        if (!map.has(key)) {
+            map.set(key, event);
+        } else {
+            const existing = map.get(key);
+            const existingStart = new Date(existing.start_time);
+
+            // keep the EARLIEST one only
+            if (start < existingStart) {
+                map.set(key, event);
+            }
+        }
+    }
+
+    return Array.from(map.values());
+}
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    const [routes, setRoutes] = useState<Route[]>([]);
+    const [rings, setRings] = useState<Ring[]>([]);
+
+    const [enabledCategories, setEnabledCategories] = useState<Record<DateCategory, boolean>>({
+        ongoing: true,
+        today: true,
+        tomorrow: true,
+        day2: true,
+        day3: true,
+        day4to5: true,
+        day6plus: true
+    });
+
+    const toggleCategory = (cat: DateCategory) => {
+        setEnabledCategories(prev => ({
+            ...prev,
+            [cat]: !prev[cat]
+        }));
+    };
+
+    const [dateRange, setDateRange] = useState<[Date, Date]>(() => {
+        const today = new Date();
+        const weekFromNow = new Date();
+        weekFromNow.setDate(today.getDate() + 7);
+        return [today, weekFromNow];
+    });
+
+    const minDate = new Date();
+    const maxDate = new Date();
+    maxDate.setMonth(maxDate.getMonth() + 3); // 3 months max
+    const sliderValues = dateRange.map(d => d.getTime());
+
+    useEffect(() => {
+        async function fetchEvents() {
+            const res = await fetch("/api/vatsim/events", {
+                next: { revalidate: 300 }
+            });
+
+            const json = await res.json();
+
+            const dedupedEvents = dedupeEventsByEarliest(json.data);
+            const { allRoutes, allRings } = buildRoutesAndRings(dedupedEvents, airportsDb);
+
+            setRoutes(allRoutes);
+            setRings(allRings);
+        }
+
+        fetchEvents();
+    }, []);
+
+    const filteredRoutes = routes.filter(
+        r => enabledCategories[r.category]
+    );
+
+    const filteredRings = rings.filter(
+        r => enabledCategories[r.category]
+    );
+
+    // Get ICAOs used in routes (both start and end)
+    const usedIcaos = new Set<string>();
+    filteredRoutes.forEach(r => {
+        usedIcaos.add(r.startIcao);
+        usedIcaos.add(r.endIcao);
+    });
+    filteredRings.forEach(r => {
+        usedIcaos.add(r.icao);
+    });
+
+    // Only show labels for used airports
+    const airportPoints = Object.entries(airportsDb)
+        .filter(([icao]) => usedIcaos.has(icao))
+        .map(([icao, coords]) => ({
+            lat: coords.lat,
+            lng: coords.lng,
+            label: icao
+        }));
+
+    return (
+        <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black border" style={{fontFamily: 'monospace'}}>
+            <main>
+                <GlobeComponent routes={filteredRoutes} rings={filteredRings} airportPoints={airportPoints} />
+            </main>
+
+            {/* Title */}
+            <div style={{
+                position: 'fixed',
+                top: '20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                color: 'white',
+                opacity: 0.85,
+                padding: '8px 16px',
+                borderRadius: '8px',
+                fontSize: '1.5rem',
+                zIndex: 10000,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+            }}>
+                <span style={{ fontWeight: 'bold' }}>VATSIM EVENTS MAP</span>
+                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>by Miggle</span>
+            </div>
+
+
+            {/* Legend container */}
+            <div
+                style={{
+                    position: 'fixed',
+                    bottom: '20px',
+                    right: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    padding: '12px',
+                    zIndex: 10000,
+                    borderRadius: '8px',
+
+                    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+                <span style={{ fontWeight: 'bold'}}>Event Dates</span>
+                
+                <span style={{ fontSize: '0.75rem', color: '#ccc', textAlign: 'center' }}>(Click to toggle)</span>
+
+                <div style={{ marginTop: '8px' }}>
+                {[
+                    ['ongoing', 'Ongoing', '#00ff00'],
+                    ['today', 'Today', '#ffcc00'],
+                    ['tomorrow', 'Tomorrow', '#ff8800'],
+                    ['day2', 'In 2 Days', '#ff4444'],
+                    ['day3', 'In 3 Days', '#ff00ff'],
+                    ['day4to5', 'In 4–5 Days', '#8800ff'],
+                    ['day6plus', 'In 6+ Days', '#00f']
+                ].map(([key, label, color]) => {
+                    const enabled = enabledCategories[key as DateCategory];
+
+                    return (
+                        <div
+                            key={key}
+                            onClick={() => toggleCategory(key as DateCategory)}
+                            style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            marginBottom: '6px',
+                            cursor: 'pointer',
+                            opacity: enabled ? 1 : 0.35,
+                            transition: 'opacity 0.2s ease'
+                            }}
+                        >
+                            {/* Color box = checkbox */}
+                            <span
+                                style={{
+                                    width: '16px',
+                                    height: '16px',
+                                    backgroundColor: color,
+                                    borderRadius: '3px',
+                                    border: enabled ? 'none' : '1px solid #666',
+                                    boxSizing: 'border-box'
+                                }}
+                            />
+                            <span style={{ fontSize: '0.8rem' }}>{label}</span>
+                        </div>
+                    );
+                })}
+                </div>
+
+            </div>
+
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    );
 }
