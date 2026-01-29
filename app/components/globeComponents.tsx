@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Pilot, Ring, Route } from '../page';
+import { Pilot, Ring, Route } from '@/app/types';
 // Only load react-globe.gl on the client
 const Globe = dynamic(() => import('react-globe.gl'), { ssr: false });
 
