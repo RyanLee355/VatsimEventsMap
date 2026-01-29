@@ -1,5 +1,29 @@
 import { Route, Ring, DateCategory } from "@/app/types";
-import airportsDb from "@/app/data/airports.json";
+// import airportsDb from "@/app/data/airports.json";
+import airportsDb from "@/app/data/iata-icao.json";
+
+function getAirportSafe(
+    icao: string,
+    airportsDb: { [icao: string]: { lat: number; lng: number; name: string } }
+) {
+    const airport = airportsDb[icao];
+
+    if (!airport) {
+        return {
+            lat: 0,
+            lng: 0,
+            name: icao, // fallback name
+            found: false,
+        };
+    }
+
+    return {
+        lat: airport.lat,
+        lng: airport.lng,
+        name: airport.name,
+        found: true,
+    };
+}
 
 export function eventToRoutesAndRings(
     event: {
@@ -16,8 +40,8 @@ export function eventToRoutesAndRings(
 
     if (!event.airports || event.airports.length === 0) return { routes, rings };
         const allIcaosWithNames = event.airports.map((a) => {
-        const airport = airportsDb[a.icao];
-        return airport ? `${airport.name} - (${a.icao})` : a.icao;
+        const airport = getAirportSafe(a.icao, airportsDb);
+        return `${airport.name} - (${a.icao})`;
     });
 
     const today = new Date();
@@ -62,27 +86,48 @@ export function eventToRoutesAndRings(
 
     if (event.airports.length === 1) {
         const a = event.airports[0].icao;
-        const airport = airportsDb[a];
-        if (!airport) return { routes, rings };
+        const airport = getAirportSafe(a, airportsDb);
 
-        rings.push({
-            icao: a,
-            lat: airport.lat,
-            lng: airport.lng,
-            color: getColorForEvent(new Date(event.start_time), new Date(event.end_time)),
-            category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
-            eventName: event.name,
-            startTime: new Date(event.start_time),
-            endTime: new Date(event.end_time),
-            radius: 100000, // in meters, adjust as needed
-            banner: event.banner,
-        });
+        if (airport.found) {
+            rings.push({
+                icao: a,
+                lat: airport.lat,
+                lng: airport.lng,
+                color: getColorForEvent(new Date(event.start_time), new Date(event.end_time)),
+                category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
+                eventName: event.name,
+                startTime: new Date(event.start_time),
+                endTime: new Date(event.end_time),
+                radius: 100000, // in meters, adjust as needed
+                banner: event.banner,
+            });
+
+            const offset = 0.05; // Lat/Long Degs. offset for visual separation
+
+            routes.push({
+                startIcao: a,
+                endIcao: a,
+                startLat: airport.lat,
+                startLng: airport.lng,
+                endLat: airport.lat,
+                endLng: airport.lng + offset,
+                color: getColorForEvent(
+                    new Date(event.start_time),
+                    new Date(event.end_time)
+                ),
+                category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
+                eventName: event.name,
+                startTime: new Date(event.start_time),
+                endTime: new Date(event.end_time),
+                banner: event.banner,
+                airportsInvolved: [`${airport.name} - (${a})`],
+            });
+        }
     }
 
     if (event.airports.length === 1) {
         const a = event.airports[0].icao;
-        const airport = airportsDb[a];
-        if (!airport) return { routes, rings };
+        const airport = getAirportSafe(a, airportsDb);
 
         const offset = 0.05; // Lat/Long Degs. offset for visual separation
 
@@ -108,7 +153,6 @@ export function eventToRoutesAndRings(
         return { routes, rings };
     }
 
-
     const seenPairs = new Set<string>();
 
     for (let i = 0; i < event.airports.length; i++) {
@@ -119,25 +163,27 @@ export function eventToRoutesAndRings(
             if (seenPairs.has(pairKey)) continue;
             seenPairs.add(pairKey);
 
-            const p1 = airportsDb[a1];
-            const p2 = airportsDb[a2];
-            if (!p1 || !p2) continue;
+            const p1 = getAirportSafe(a1, airportsDb);
+            const p2 = getAirportSafe(a2, airportsDb);
 
-            routes.push({
-                startIcao: a1,
-                endIcao: a2,
-                startLat: p1.lat,
-                startLng: p1.lng,
-                endLat: p2.lat,
-                endLng: p2.lng,
-                color: getColorForEvent(new Date(event.start_time), new Date(event.end_time)),
-                category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
-                eventName: event.name,
-                startTime: new Date(event.start_time),
-                endTime: new Date(event.end_time),
-                banner: event.banner,
-                airportsInvolved: allIcaosWithNames,
-            });
+            // Only draw arcs if both airports exist
+            if (p1.found && p2.found) {
+                routes.push({
+                    startIcao: a1,
+                    endIcao: a2,
+                    startLat: p1.lat,
+                    startLng: p1.lng,
+                    endLat: p2.lat,
+                    endLng: p2.lng,
+                    color: getColorForEvent(new Date(event.start_time), new Date(event.end_time)),
+                    category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
+                    eventName: event.name,
+                    startTime: new Date(event.start_time),
+                    endTime: new Date(event.end_time),
+                    banner: event.banner,
+                    airportsInvolved: allIcaosWithNames,
+                });
+            }
         }
     }
 

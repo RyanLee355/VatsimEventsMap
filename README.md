@@ -32,5 +32,6 @@ Open [http://localhost:3000](http://localhost:3000) to view the website.
 
 ## Acknowledgements
 - [react-globe.gl](https://github.com/vasturiano/react-globe.gl) - 3D Globe Model Visualiser
-- [The Global Airport Database](https://www.partow.net/miscellaneous/airportdatabase/) - Used for airport ICAO data (ICAO code, lat./long. coordinates).
+- [IATA-ICAO Database](https://github.com/ip2location/ip2location-iata-icao) - Used for airport ICAO data (ICAO code, lat./long. coordinates).
+- [The Global Airport Database](https://www.partow.net/miscellaneous/airportdatabase/) - (Old database) Used for airport ICAO data (ICAO code, lat./long. coordinates).
 - [Vatsim API](https://vatsim.dev/services/apis/) - Official Event Data
