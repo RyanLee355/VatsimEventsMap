@@ -11,7 +11,7 @@ This map serves as an alternate to the 2D official vatsim events map. It offers 
 - Live pilot display w/ event filter
 - Day/Night Toggle
 
-![Version 1 of Vatsim Events 3D Map](./public/images/vatsim_events_map_screenshot1.png)
+![Version 1.1 of Vatsim Events 3D Map](./public/images/vatsim_events_map_screenshot1.png)
 
 
 ## Project Architecture
