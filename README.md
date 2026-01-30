@@ -28,9 +28,10 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000) to view the website.
 
 ## Known Issues
+- **Reduced Performance**: Signficiantly reduced performance when showing many events (difficult to solve, derived from limitations on react-globe).
+- **Fails to load**: Failure to load the site on Firefox browsers may occur. Firefox Beta however shows consistent working behaviour.
 - **Missing Events/Airports**: Some airport ICAOs are not registered and will fail to show on the map. Notably, smaller airports that may not have been documented yet on TGAD.
-- **Reduced Performance**: Signficiantly reduced performance with many options enabled (difficult to solve, derived from limitations on react-globe).
-- **Map Resolution**: Higher map resolution is yet to be explored due to R-G utilising a equirectangular projection, contrary to a interactive map (i.e. OpenStreetMap).
+- **Map Resolution**: Higher map resolution is yet to be explored due to R-G utilising a equirectangular projection, contrary to a interactive map found in other popular alternatives (i.e. OpenStreetMap).
 
 ## Acknowledgements
 - [react-globe.gl](https://github.com/vasturiano/react-globe.gl) - 3D Globe Model Visualiser
