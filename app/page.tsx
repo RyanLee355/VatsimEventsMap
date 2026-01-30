@@ -6,6 +6,7 @@ import airportsDb from "@/app/data/airports.json";
 import GlobeWrapper from "@/app/components/globeWrapper";
 import SettingsPanel from "@/app/components/settingsPanel";
 import EventSidePanel from "@/app/components/eventSidePanel";
+import styles from "./page.module.css";
 
 export default function Home() {
     const [routes, setRoutes] = useState<Route[]>([]);
@@ -21,9 +22,14 @@ export default function Home() {
         day2: true,
         day3: true,
         day4to5: true,
-        day6plus: true,
+        day6plus: false,
     });
-    const [panelCollapsed, setPanelCollapsed] = useState(false);
+    const [panelCollapsed, setPanelCollapsed] = useState(true);
+
+    useEffect(() => {
+        const isMobile = window.matchMedia("(max-width: 768px)").matches;
+        setPanelCollapsed(isMobile);
+    }, []);
 
     useEffect(() => {
         fetch("/api/vatsim/events", { next: { revalidate: 300 } })
@@ -70,23 +76,12 @@ export default function Home() {
     });
 
     return (
-        <div style={{ fontFamily: 'monospace' }}>
+        <div className={styles.root}>
             <button
                 onClick={() => setPanelCollapsed(prev => !prev)}
-                style={{
-                    position: "fixed",
-                    top: "20px",
-                    left: 0,
-                    zIndex: 11000,
-                    backgroundColor: "rgba(0,0,0,0.7)",
-                    color: "white",
-                    border: "none",
-                    padding: "8px 12px",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    transform: panelCollapsed ? "translateX(0)" : "translateX(25vw)", // slide with panel
-                    transition: "transform 0.3s ease",
-                }}
+                className={`${styles.panelToggle} ${
+                    panelCollapsed ? styles.panelClosed : styles.panelOpen
+                }`}
             >
                 {panelCollapsed ? "▶" : "◀"}
             </button>
@@ -114,10 +109,13 @@ export default function Home() {
                 toggleDayNight={toggleDayNight}
             />
 
-            {/* Title (could also be modularized if needed) */}
-            <div style={{ position: 'fixed', top: '20px', left: '50%', transform: 'translateX(-50%)', color: 'white', opacity: 0.85, padding: '8px 16px', borderRadius: '8px', fontSize: '1.5rem', zIndex: 10000, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                <span style={{ fontWeight: 'bold' }}>VATSIM EVENTS 3D MAP</span>
-                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>Version 1.1 | by Miggle | <a href="https://github.com/RyanLee355/VatsimEventsMap">GitHub Repo.</a></span>
+            {/* Title */}
+            <div className={styles.title}>
+                <span style={{ fontWeight: "bold", textAlign: "center" }}>VATSIM EVENTS 3D MAP</span>
+                <span className={styles.subtitle} style={{ textAlign: "center" }}>
+                    Version 1.2 | by Miggle |{" "}
+                    <a href="https://github.com/RyanLee355/VatsimEventsMap">GitHub Repo.</a>
+                </span>
             </div>
         </div>
     );

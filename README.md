@@ -1,15 +1,17 @@
-# Vatsim Events Map (Unofficial)
+# VATSIM Events Map
 
-## Overview
-This map serves as an alternate to the 2D official vatsim events map. It offers a more visually responsive interface with the ability to filter by event day. The project aims to bridge the current data visualisation gap between VATSIM members and a convenient and effective viewing medium.
+This map serves as an alternate to the official 2D VATSIM events map. It offers a more visually responsive interface with the ability to filter by event day. The project aims to bridge the current data visualisation gap between VATSIM members and a convenient and effective viewing medium.
 
-### Features
+Access the website at [https://vatsim-events-map.vercel.app/](https://vatsim-events-map.vercel.app/).
+
+## Features
 - Interactive (Click & Drag)
 - Tooltips (Hover)
     - Includes scheduled event times, dates, and ICAOs.
 - Filters (Time-based)
 - Live pilot display w/ event filter
 - Day/Night Toggle
+- Mobile Compatability
 
 ![Version 1.1 of Vatsim Events 3D Map](./public/images/vatsim_events_map_screenshot1.png)
 
@@ -26,9 +28,9 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000) to view the website.
 
 ## Known Issues
-- **Missing Events/Airports**: Some airport ICAOs are not registered and will fail to show on the map. Notably, smaller airports that may not have been documented yet on TGAD. (e.g. KTRI, KBKW, KCRW)
+- **Missing Events/Airports**: Some airport ICAOs are not registered and will fail to show on the map. Notably, smaller airports that may not have been documented yet on TGAD.
 - **Reduced Performance**: Signficiantly reduced performance with many options enabled (difficult to solve, derived from limitations on react-globe).
-- **Map Resolution**: Higher map resolution is yet to be explored due to R-G utilising a equirectangular projection, contrary to a interactive map (i.e. OpenStreetMap)
+- **Map Resolution**: Higher map resolution is yet to be explored due to R-G utilising a equirectangular projection, contrary to a interactive map (i.e. OpenStreetMap).
 
 ## Acknowledgements
 - [react-globe.gl](https://github.com/vasturiano/react-globe.gl) - 3D Globe Model Visualiser

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Pilot, Ring, Route } from '@/app/types';
 // Only load react-globe.gl on the client
@@ -21,6 +21,37 @@ export default function GlobeComponent({
     const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [hoveredArc, setHoveredArc] = useState<any | null>(null);
     const [hoveredPilot, setHoveredPilot] = useState<any | null>(null);
+    const [viewport, setViewport] = useState({ w: 0, h: 0 });
+
+    useEffect(() => {
+        const update = () =>
+            setViewport({ w: window.innerWidth, h: window.innerHeight });
+
+        update();
+        window.addEventListener("resize", update);
+        return () => window.removeEventListener("resize", update);
+    }, []);
+
+    function getTooltipStyle(
+        mouseX: number,
+        mouseY: number,
+        tooltipWidth = 280,
+        tooltipHeight = 200
+    ) {
+        const offset = 12;
+
+        const placeLeft = mouseX > viewport.w / 2;
+        const placeTop = mouseY > viewport.h / 2;
+
+        return {
+            left: placeLeft
+                ? mouseX - tooltipWidth - offset
+                : mouseX + offset,
+            top: placeTop
+                ? mouseY - tooltipHeight - offset
+                : mouseY + offset,
+        };
+    }
 
     return (
         <div
@@ -79,8 +110,7 @@ export default function GlobeComponent({
                 <div
                     style={{
                         position: 'fixed',
-                        top: mousePos.y + 10,
-                        left: mousePos.x + 10,
+                        ...getTooltipStyle(mousePos.x, mousePos.y, 280),
                         backgroundColor: 'rgba(0, 0, 0, 0.9)',
                         color: '#fff',
                         padding: '12px',
@@ -89,8 +119,9 @@ export default function GlobeComponent({
                         zIndex: 9999,
                         maxWidth: '280px',
                         boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                        fontFamily: 'sans-serif'
+                        fontFamily: 'sans-serif',
                     }}
+
                 >
                     {/* Banner Image */}
                     {hoveredArc.banner && (
@@ -165,8 +196,7 @@ export default function GlobeComponent({
                 <div
                     style={{
                         position: 'fixed',
-                        top: mousePos.y + 10,
-                        left: mousePos.x + 10,
+                        ...getTooltipStyle(mousePos.x, mousePos.y, 220),
                         backgroundColor: 'rgba(0,0,0,0.85)',
                         color: '#fff',
                         padding: '8px',

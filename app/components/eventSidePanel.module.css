@@ -1,0 +1,114 @@
+/* EventSidePanel.module.css */
+
+:root {
+    --side-panel-width: 25vw;
+}
+
+@media (max-width: 768px) {
+    :root {
+        --side-panel-width: 250px;
+    }
+}
+
+
+.panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 25vw;
+    min-width: 250px;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 16px;
+    overflow-y: auto;
+    z-index: 10000;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease;
+}
+
+.panelCollapsed {
+    transform: translateX(-100%);
+}
+
+.panelOpen {
+    transform: translateX(0);
+}
+
+.title {
+    margin-bottom: 16px;
+    font-size: 1.25rem;
+    font-weight: bold;
+}
+
+.dayHeader {
+    margin-top: 12px;
+    margin-bottom: 4px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    color: #aaa;
+}
+
+.eventCard {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.05);
+    align-items: center;
+}
+
+.banner {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: #222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.noImage {
+    color: #666;
+    font-size: 0.75rem;
+}
+
+.eventContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.status {
+    font-size: 0.75rem;
+    margin-bottom: 2px;
+}
+
+.ongoing {
+    color: #00ff00;
+    font-weight: bold;
+}
+
+.upcoming {
+    color: #888;
+}
+
+.eventName {
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.eventTime {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.eventAirports {
+    font-size: 0.75rem;
+    margin-top: 4px;
+    color: #ccc;
+}

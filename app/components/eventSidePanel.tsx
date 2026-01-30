@@ -1,5 +1,6 @@
 import { Route, Ring } from "@/app/types";
 import Image from "next/image";
+import styles from "./eventSidePanel.module.css";
 
 type Props = {
     routes: Route[];
@@ -58,24 +59,11 @@ export default function EventSidePanel({ routes, rings, collapsed }: Props) {
     let lastDayLabel = "";
     return (
         <div
-            style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                width: "25vw",
-                minWidth: "250px",
-                height: "100%",
-                backgroundColor: "rgba(0,0,0,0.8)",
-                color: "white",
-                padding: "16px",
-                overflowY: "auto",
-                zIndex: 10000,
-                boxShadow: "2px 0 10px rgba(0,0,0,0.5)",
-                transition: "transform 0.3s ease",
-                transform: collapsed ? "translateX(-100%)" : "translateX(0)",
-            }}
+            className={`${styles.panel} ${
+                collapsed ? styles.panelCollapsed : styles.panelOpen
+            }`}
         >
-            <h2 style={{ marginBottom: "16px", fontSize: "1.25rem", fontWeight: "bold" }}>Events</h2>
+            <h2 className={styles.title}>Events</h2>
 
             {events.map((event, idx) => {
                 const dayLabel = getDayLabel(event.startTime);
@@ -85,35 +73,11 @@ export default function EventSidePanel({ routes, rings, collapsed }: Props) {
                 return (
                     <div key={idx}>
                         {showHeader && (
-                            <div style={{ marginTop: "12px", marginBottom: "4px", fontWeight: "bold", fontSize: "0.85rem", color: "#aaa" }}>
-                                {dayLabel}
-                            </div>
+                            <div className={styles.dayHeader}>{dayLabel}</div>
                         )}
 
-                        <div
-                            style={{
-                                display: "flex",
-                                gap: "8px",
-                                marginBottom: "12px",
-                                padding: "8px",
-                                borderRadius: "6px",
-                                backgroundColor: "rgba(255,255,255,0.05)",
-                                alignItems: "center",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    width: "80px",
-                                    height: "80px",
-                                    flexShrink: 0,
-                                    borderRadius: "6px",
-                                    overflow: "hidden",
-                                    backgroundColor: "#222",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                }}
-                            >
+                        <div className={styles.eventCard}>
+                            <div className={styles.banner}>
                                 {event.banner ? (
                                     <Image
                                         src={event.banner}
@@ -123,26 +87,31 @@ export default function EventSidePanel({ routes, rings, collapsed }: Props) {
                                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                                     />
                                 ) : (
-                                    <span style={{ color: "#666", fontSize: "0.75rem" }}>No Image</span>
+                                    <span className={styles.noImage}>No Image</span>
                                 )}
                             </div>
 
-                            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                                <div style={{ fontSize: "0.75rem", marginBottom: "2px" }}>
+
+                            <div className={styles.eventContent}>
+                                <div className={styles.status}>
                                     {event.startTime <= new Date() && event.endTime >= new Date() ? (
-                                        <span style={{ color: "#00ff00", fontWeight: "bold" }}>● Ongoing</span>
+                                        <span className={styles.ongoing}>● Ongoing</span>
                                     ) : (
-                                        <span style={{ color: "#888888" }}>● Upcoming</span>
+                                        <span className={styles.upcoming}>● Upcoming</span>
                                     )}
                                 </div>
-                                <div style={{ fontWeight: "bold", fontSize: "0.9rem" }}>{event.name}</div>
-                                <div style={{ fontSize: "0.75rem", opacity: 0.7 }}>
+
+                                <div className={styles.eventName}>{event.name}</div>
+
+                                <div className={styles.eventTime}>
                                     {event.startTime.toLocaleString()} → {event.endTime.toLocaleString()}
                                 </div>
-                                <div style={{ fontSize: "0.75rem", marginTop: "4px", color: "#ccc" }}>
+
+                                <div className={styles.eventAirports}>
                                     {event.airports.join(", ")}
                                 </div>
                             </div>
+
                         </div>
                     </div>
                 );
