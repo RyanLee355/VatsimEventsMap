@@ -29,6 +29,100 @@
     display: none;
 }
 
+.toggleGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.toggleButton {
+    cursor: pointer;
+    background-color: rgba(0,0,0,0.6);
+    padding: 12px;
+    border-radius: 8px;
+    color: white;
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    border-radius: 8px;
+    background-color: rgba(0,0,0,0.6);
+    gap: 6px;
+}
+
+.sectionTitle {
+    font-weight: bold;
+}
+
+.sectionHint {
+    font-size: 0.75rem;
+    color: #ccc;
+}
+
+.disabledHint {
+    font-size: 0.7rem;
+    color: #aaa;
+}
+
+.categoryList {
+    margin-top: 8px;
+}
+
+.categoryItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.enabled {
+    opacity: 1;
+}
+
+.disabledItem {
+    opacity: 0.35;
+}
+
+.colorBox {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+}
+
+.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.toggleHeader {
+    cursor: pointer;
+    color: white;
+    font-weight: bold;
+}
+
+.dateRange {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dateRange label {
+    font-size: 0.75rem;
+    color: #ccc;
+}
+
+.dateRange input {
+    padding: 6px;
+    border-radius: 6px;
+    border: none;
+}
+
+
 /* Desktop */
 @media (min-width: 769px) {
     .mobileToggle {

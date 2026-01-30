@@ -25,6 +25,15 @@ export default function Home() {
         day6plus: false,
     });
     const [panelCollapsed, setPanelCollapsed] = useState(true);
+    const [useDateRange, setUseDateRange] = useState(false);
+    const [dateRange, setDateRange] = useState<{
+    start: string | null;
+    end: string | null;
+    }>({
+    start: null,
+    end: null
+    });
+
 
     useEffect(() => {
         const isMobile = window.matchMedia("(max-width: 768px)").matches;
@@ -53,9 +62,30 @@ export default function Home() {
     const togglePilotsEvent = () => setEventPilotToggle(prev => !prev);
     const toggleDayNight = () => setDayNightToggle(prev => !prev);
 
+    const isWithinDateRange = (start: Date, end: Date) => {
+        if (!useDateRange || !dateRange.start || !dateRange.end) return true;
+
+        const rangeStart = new Date(dateRange.start);
+        const rangeEnd = new Date(dateRange.end);
+
+        // Event overlaps the selected range
+        return start <= rangeEnd && end >= rangeStart;
+    };
+
     // Filtering
-    const filteredRoutes = routes.filter(r => enabledCategories[r.category]);
-    const filteredRings = rings.filter(r => enabledCategories[r.category]);
+    const filteredRoutes = routes.filter(r => {
+        if (useDateRange) {
+            return isWithinDateRange(r.startTime, r.endTime);
+        }
+        return enabledCategories[r.category];
+    });
+
+    const filteredRings = rings.filter(r => {
+        if (useDateRange) {
+            return isWithinDateRange(r.startTime, r.endTime);
+        }
+        return enabledCategories[r.category];
+    });
 
     const usedIcaos = new Set<string>();
     filteredRoutes.forEach(r => { usedIcaos.add(r.startIcao); usedIcaos.add(r.endIcao); });
@@ -107,6 +137,10 @@ export default function Home() {
                 togglePilots={togglePilots}
                 togglePilotsEvent={togglePilotsEvent}
                 toggleDayNight={toggleDayNight}
+                useDateRange={useDateRange}
+                setUseDateRange={setUseDateRange}
+                dateRange={dateRange}
+                setDateRange={setDateRange}
             />
 
             {/* Title */}
