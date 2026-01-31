@@ -27,14 +27,35 @@ export default function Home() {
     const [panelCollapsed, setPanelCollapsed] = useState(true);
     const [useDateRange, setUseDateRange] = useState(false);
     const [dateRange, setDateRange] = useState<{
-    start: string | null;
-    end: string | null;
-    }>({
-    start: null,
-    end: null
+        start: string | null;
+        end: string | null;
+        }>({
+        start: null,
+        end: null
     });
+    const [showNormalEvents, setShowNormalEvents] = useState(true);
+    const [showExamEvents, setShowExamEvents] = useState(true);
 
+    const toggleNormalEvents = () => {
+        setShowNormalEvents(prev => {
+            // If turning OFF the last enabled one, flip exams ON
+            if (prev && !showExamEvents) {
+                setShowExamEvents(true);
+            }
+            return !prev;
+        });
+    };
 
+    const toggleExamEvents = () => {
+        setShowExamEvents(prev => {
+            // If turning OFF the last enabled one, flip normal ON
+            if (prev && !showNormalEvents) {
+                setShowNormalEvents(true);
+            }
+            return !prev;
+        });
+    };
+    
     useEffect(() => {
         const isMobile = window.matchMedia("(max-width: 768px)").matches;
         setPanelCollapsed(isMobile);
@@ -72,18 +93,33 @@ export default function Home() {
         return start <= rangeEnd && end >= rangeStart;
     };
 
+    const isExamEvent = (name: string) =>
+        name.toLowerCase().includes("exam");
+
     // Filtering
     const filteredRoutes = routes.filter(r => {
+        const exam = isExamEvent(r.eventName);
+
+        if (exam && !showExamEvents) return false;
+        if (!exam && !showNormalEvents) return false;
+
         if (useDateRange) {
             return isWithinDateRange(r.startTime, r.endTime);
         }
+
         return enabledCategories[r.category];
     });
 
     const filteredRings = rings.filter(r => {
+        const exam = isExamEvent(r.eventName);
+
+        if (exam && !showExamEvents) return false;
+        if (!exam && !showNormalEvents) return false;
+
         if (useDateRange) {
             return isWithinDateRange(r.startTime, r.endTime);
         }
+
         return enabledCategories[r.category];
     });
 
@@ -137,6 +173,12 @@ export default function Home() {
                 togglePilots={togglePilots}
                 togglePilotsEvent={togglePilotsEvent}
                 toggleDayNight={toggleDayNight}
+
+                showNormalEvents={showNormalEvents}
+                showExamEvents={showExamEvents}
+                toggleNormalEvents={toggleNormalEvents}
+                toggleExamEvents={toggleExamEvents}
+
                 useDateRange={useDateRange}
                 setUseDateRange={setUseDateRange}
                 dateRange={dateRange}

@@ -22,6 +22,14 @@ export default function GlobeComponent({
     const [hoveredArc, setHoveredArc] = useState<any | null>(null);
     const [hoveredPilot, setHoveredPilot] = useState<any | null>(null);
     const [viewport, setViewport] = useState({ w: 0, h: 0 });
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth <= 768);
+        check();
+        window.addEventListener("resize", check);
+        return () => window.removeEventListener("resize", check);
+    }, []);
 
     useEffect(() => {
         const update = () =>
@@ -77,9 +85,11 @@ export default function GlobeComponent({
 
                 arcsData={routes}
                 arcColor={(d: any) => d.color}
-                onArcHover={(arc, prevArc) => {
-                    // console.log("Arc: ", arc);
-                    setHoveredArc(arc ?? null);
+                onArcHover={(arc) => {
+                    if (!hoveredArc && !hoveredPilot) {
+                        setHoveredArc(arc ?? null);
+                    };
+
                 }}
 
                 ringsData={rings}
@@ -102,11 +112,15 @@ export default function GlobeComponent({
                 pointAltitude={(d: any) => 0} // normalize to globe radius
                 pointColor={() => "#007900"} // or color by type/rating
                 pointRadius={0.04}
-                onPointHover={(pilot) => setHoveredPilot(pilot ?? null)}
+                onPointHover={(pilot) => {
+                    if (!hoveredPilot && !hoveredArc) {
+                        setHoveredPilot(pilot ?? null);
+                    }
+                }}
             />
 
             {/* Event Tooltip Card */}
-            {hoveredArc && (
+            {hoveredArc && !isMobile && (
                 <div
                     style={{
                         position: 'fixed',
@@ -192,7 +206,7 @@ export default function GlobeComponent({
             )}
 
             {/* Pilot Tooltip */}
-            {hoveredPilot && (
+            {hoveredPilot && !isMobile && (
                 <div
                     style={{
                         position: 'fixed',
@@ -220,6 +234,179 @@ export default function GlobeComponent({
                     )}
                 </div>
             )}
+
+            {hoveredArc && isMobile && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        bottom: 0,
+                        left: 15,
+                        right: 15,
+                        background: 'rgba(0,0,0,0.95)',
+                        color: '#fff',
+                        padding: '14px',
+                        zIndex: 10000,
+                        borderTopLeftRadius: '14px',
+                        borderTopRightRadius: '14px',
+                        boxShadow: '0 -4px 14px rgba(0,0,0,0.45)',
+                        maxHeight: '50vh',
+                        overflowY: 'auto',
+                        fontFamily: 'sans-serif',
+                    }}
+                >
+
+                    {/* Banner image */}
+                    {hoveredArc.banner && (
+                        <img
+                            src={hoveredArc.banner}
+                            alt={hoveredArc.eventName}
+                            style={{
+                                width: '100%',
+                                height: '140px',
+                                objectFit: 'cover',
+                                borderRadius: '8px',
+                                marginBottom: '10px',
+                            }}
+                        />
+                    )}
+
+                    {/* Close button */}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '16px',
+                            right: '16px',
+                            fontSize: '1.25rem',
+                            cursor: 'pointer',
+                            color: '#ddd',
+                            fontWeight: 'bold',
+                            backgroundColor: 'rgba(0,0,0,0.3)',
+                            borderRadius: '50%',
+                            width: '28px',
+                            textAlign: 'center',
+                        }}
+                        onClick={() => setHoveredArc(null)}
+                    >
+                        ✕
+                    </div>
+
+                    {/* Date tag */}
+                    {hoveredArc.startTime && (() => {
+                        const now = new Date();
+                        const startDate = new Date(hoveredArc.startTime);
+                        const diffTime =
+                            startDate.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0);
+                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+                        let dateTag = '';
+                        if (diffDays === 0) dateTag = 'Today';
+                        else if (diffDays === 1) dateTag = 'Tomorrow';
+                        else if (diffDays > 1) dateTag = `In ${diffDays} Days`;
+                        else dateTag = `${Math.abs(diffDays)} Days Ago`;
+
+                        return (
+                            <div
+                                style={{
+                                    display: 'inline-block',
+                                    backgroundColor: hoveredArc.color[0],
+                                    color: 'lightgray',
+                                    fontWeight: 'bold',
+                                    fontSize: '0.75rem',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    marginBottom: '6px',
+                                }}
+                            >
+                                {dateTag}
+                            </div>
+                        );
+                    })()}
+
+                    {/* Event name */}
+                    <div
+                        style={{
+                            fontWeight: 'bold',
+                            fontSize: '1.05rem',
+                            marginBottom: '6px',
+                        }}
+                    >
+                        {hoveredArc.eventName}
+                    </div>
+
+                    {/* Date & time */}
+                    {hoveredArc.startTime && hoveredArc.endTime && (
+                        <div
+                            style={{
+                                fontSize: '0.85rem',
+                                marginBottom: '8px',
+                                color: '#ccc',
+                            }}
+                        >
+                            {hoveredArc.startTime.toLocaleString()} –{' '}
+                            {hoveredArc.endTime.toLocaleString()}
+                        </div>
+                    )}
+
+                    {/* Airports */}
+                    <div style={{ fontSize: '0.9rem' }}>
+                        <strong>Airports:</strong>{' '}
+                        {hoveredArc.airportsInvolved.join(', ')}
+                    </div>
+                </div>
+            )}
+
+
+            {hoveredPilot && isMobile && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        bottom: 0,
+                        left: 15,
+                        right: 15,
+                        background: 'rgba(0,0,0,0.95)',
+                        color: '#fff',
+                        padding: '14px',
+                        zIndex: 10000,
+                        borderTopLeftRadius: '12px',
+                        borderTopRightRadius: '12px',
+                        boxShadow: '0 -4px 12px rgba(0,0,0,0.4)',
+                        fontFamily: 'sans-serif',
+                    }}
+                >
+                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                        {hoveredPilot.callsign} — {hoveredPilot.name}
+                    </div>
+
+                    {/* Close button */}
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '16px',
+                            right: '16px',
+                            fontSize: '1.25rem',
+                            cursor: 'pointer',
+                            color: '#ddd',
+                            fontWeight: 'bold',
+                            backgroundColor: 'rgba(0,0,0,0.3)',
+                            borderRadius: '50%',
+                            width: '28px',
+                            textAlign: 'center',
+                        }}
+                        onClick={() => setHoveredPilot(null)}
+                    >
+                        ✕
+                    </div>
+
+                    <div>ALT: {hoveredPilot.altitude} ft</div>
+                    <div>GS: {hoveredPilot.groundspeed} kt</div>
+                    {hoveredPilot.flight_plan && (
+                        <div>
+                            Route: {hoveredPilot.flight_plan.departure} → {hoveredPilot.flight_plan.arrival}
+                        </div>
+                    )}
+                </div>
+            )}
+
 
         </div>
     );

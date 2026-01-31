@@ -11,6 +11,12 @@ type Props = {
     togglePilots: () => void;
     togglePilotsEvent: () => void;
     toggleDayNight: () => void;
+
+    showNormalEvents: boolean;
+    showExamEvents: boolean;
+    toggleNormalEvents: () => void;
+    toggleExamEvents: () => void;
+
     useDateRange: boolean;
     setUseDateRange: (value: boolean) => void;
     dateRange: {
@@ -29,6 +35,12 @@ export default function SettingsPanel({
     togglePilots,
     togglePilotsEvent,
     toggleDayNight,
+
+    showNormalEvents,
+    showExamEvents,
+    toggleNormalEvents,
+    toggleExamEvents,
+    
     useDateRange,
     setUseDateRange,
     dateRange,
@@ -78,6 +90,40 @@ export default function SettingsPanel({
 
                     <div className={styles.toggleButton} onClick={toggleDayNight}>
                         {dayNightToggle ? '> Night Mode' : '> Day Mode'}
+                    </div>
+                </div>
+
+                {/* Event Type */}
+                <div className={styles.section}>
+                    <span className={styles.sectionTitle}>Event Type</span>
+                    <span className={styles.sectionHint}>(Click to toggle)</span>
+
+                    <div className={styles.categoryList}>
+                        <div
+                            className={`${styles.categoryItem} ${
+                                showNormalEvents ? styles.enabled : styles.disabledItem
+                            }`}
+                            onClick={toggleNormalEvents}
+                        >
+                            <span
+                                className={styles.colorBox}
+                                style={{ backgroundColor: '#4da6ff' }}
+                            />
+                            <span>Normal Events</span>
+                        </div>
+
+                        <div
+                            className={`${styles.categoryItem} ${
+                                showExamEvents ? styles.enabled : styles.disabledItem
+                            }`}
+                            onClick={toggleExamEvents}
+                        >
+                            <span
+                                className={styles.colorBox}
+                                style={{ backgroundColor: '#4da6ff' }}
+                            />
+                            <span>Exams</span>
+                        </div>
                     </div>
                 </div>
 
