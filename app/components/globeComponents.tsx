@@ -61,10 +61,19 @@ export default function GlobeComponent({
         };
     }
 
+    useEffect(() => {
+        if (isMobile) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            setMousePos({ x: e.clientX, y: e.clientY });
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, [isMobile]);
+
     return (
         <div
-            className="relative"
-            onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
             style={{width: "100vw", height: "100vh"}}
         >
             <Globe
@@ -86,10 +95,13 @@ export default function GlobeComponent({
                 arcsData={routes}
                 arcColor={(d: any) => d.color}
                 onArcHover={(arc) => {
-                    if (!hoveredArc && !hoveredPilot) {
-                        setHoveredArc(arc ?? null);
-                    };
-
+                    if (arc) {
+                        setHoveredArc(arc);
+                        setHoveredPilot(null);
+                    } else if (!isMobile) {
+                        // only clear on desktop
+                        setHoveredArc(null);
+                    }
                 }}
 
                 ringsData={rings}
@@ -113,10 +125,16 @@ export default function GlobeComponent({
                 pointColor={() => "#007900"} // or color by type/rating
                 pointRadius={0.04}
                 onPointHover={(pilot) => {
-                    if (!hoveredPilot && !hoveredArc) {
-                        setHoveredPilot(pilot ?? null);
+                    if (pilot) {
+                        setHoveredPilot(pilot);
+                        setHoveredArc(null);
+                    } else if (!isMobile) {
+                        // only clear on desktop
+                        setHoveredPilot(null);
                     }
                 }}
+
+
             />
 
             {/* Event Tooltip Card */}
