@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Route, Ring, Pilot, DateCategory } from "@/app/types";
 import { dedupeEventsByEarliest, buildRoutesAndRings } from "@/app/components/events";
 import airportsDb from "@/app/data/airports.json";
@@ -7,8 +7,12 @@ import GlobeWrapper from "@/app/components/globeWrapper";
 import SettingsPanel from "@/app/components/settingsPanel";
 import EventSidePanel from "@/app/components/eventSidePanel";
 import styles from "./page.module.css";
+import { GlobeHandle } from "./components/globeComponents";
 
 export default function Home() {
+    const ZOOM_LEVEL_WHEN_FLYING_TO_EVENT = 0.8;
+
+    const globeRef = useRef<GlobeHandle>(null);
     const [routes, setRoutes] = useState<Route[]>([]);
     const [rings, setRings] = useState<Ring[]>([]);
     const [pilotData, setPilotData] = useState<Pilot[]>([]);
@@ -152,10 +156,20 @@ export default function Home() {
                 {panelCollapsed ? "▶" : "◀"}
             </button>
 
-            <EventSidePanel routes={filteredRoutes} rings={filteredRings} collapsed={panelCollapsed} />
+            <EventSidePanel
+                routes={filteredRoutes}
+                rings={filteredRings}
+                collapsed={panelCollapsed}
+                onEventClick={(event) => {
+                    const lat = event.coords[0].lat;
+                    const lon = event.coords[0].lon;
+                    globeRef.current?.flyTo(lat, lon, ZOOM_LEVEL_WHEN_FLYING_TO_EVENT);
+                }}
+            />
 
             <main>
                 <GlobeWrapper
+                    ref={globeRef}
                     routes={filteredRoutes}
                     rings={filteredRings}
                     airportPoints={airportPoints}
@@ -189,7 +203,7 @@ export default function Home() {
             <div className={styles.title}>
                 <span style={{ fontWeight: "bold", textAlign: "center" }}>VATSIM EVENTS 3D MAP</span>
                 <span className={styles.subtitle} style={{ textAlign: "center" }}>
-                    Version 1.2 | by Miggle |{" "}
+                    Version 1.3 | by Miggle |{" "}
                     <a href="https://github.com/RyanLee355/VatsimEventsMap">GitHub Repo.</a>
                 </span>
             </div>

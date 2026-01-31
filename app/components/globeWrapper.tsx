@@ -1,15 +1,7 @@
-import GlobeComponent from "./globeComponents";
-import { Route, Ring, Pilot } from "@/app/types";
+import { forwardRef } from "react";
+import GlobeComponent, { GlobeHandle } from "./globeComponents";
 
-type Props = {
-    routes: Route[];
-    rings: Ring[];
-    airportPoints: any[];
-    pilotData: Pilot[];
-    dayNightMode: boolean;
-};
-
-export default function GlobeWrapper({ routes, rings, airportPoints, pilotData, dayNightMode }: Props) {
+const GlobeWrapper = forwardRef<GlobeHandle, any>(({ routes, rings, airportPoints, pilotData, dayNightMode }, ref) => {
     return (
         <GlobeComponent
             routes={routes}
@@ -17,6 +9,9 @@ export default function GlobeWrapper({ routes, rings, airportPoints, pilotData, 
             airportPoints={airportPoints}
             pilotData={pilotData}
             dayNightMode={dayNightMode}
+            ref={ref}
         />
     );
-}
+});
+
+export default GlobeWrapper;

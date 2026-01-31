@@ -1,3 +1,4 @@
+'use client';
 import { Route, Ring } from "@/app/types";
 import Image from "next/image";
 import styles from "./eventSidePanel.module.css";
@@ -5,7 +6,12 @@ import styles from "./eventSidePanel.module.css";
 type Props = {
     routes: Route[];
     rings: Ring[];
-    collapsed: boolean; // new
+    collapsed: boolean;
+    onEventClick?: (event: {
+        name: string;
+        airports: string[];
+        coords: { lat: number; lon: number }[];
+    }) => void;
 };
 
 function getDayLabel(date: Date): string {
@@ -22,11 +28,21 @@ function getDayLabel(date: Date): string {
     return date.toLocaleDateString(undefined, options);
 }
 
-export default function EventSidePanel({ routes, rings, collapsed }: Props) {
-    const eventsMap = new Map<
-        string,
-        { name: string; startTime: Date; endTime: Date; airports: string[]; banner: string | null }
-    >();
+export default function EventSidePanel({ routes, rings, collapsed, onEventClick }: Props) {
+const eventsMap = new Map<
+    string,
+    {
+        name: string;
+        startTime: Date;
+        endTime: Date;
+        airports: string[];
+        coords: { lat: number; lon: number }[]; // new field for the globe
+        banner: string | null;
+    }
+>();
+
+    console.log("EventSidePanel received routes:", routes);
+    console.log("EventSidePanel received rings:", rings);
 
     routes.forEach(r => {
         if (!eventsMap.has(r.eventName)) {
@@ -35,6 +51,10 @@ export default function EventSidePanel({ routes, rings, collapsed }: Props) {
                 startTime: r.startTime,
                 endTime: r.endTime,
                 airports: r.airportsInvolved,
+                coords: [
+                    { lat: r.startLat, lon: r.startLng },
+                    { lat: r.endLat, lon: r.endLng }
+                ],
                 banner: r.banner,
             });
         }
@@ -47,6 +67,7 @@ export default function EventSidePanel({ routes, rings, collapsed }: Props) {
                 startTime: r.startTime,
                 endTime: r.endTime,
                 airports: [r.icao],
+                coords: [{ lat: r.lat, lon: r.lng }],
                 banner: r.banner,
             });
         }
@@ -76,7 +97,11 @@ export default function EventSidePanel({ routes, rings, collapsed }: Props) {
                             <div className={styles.dayHeader}>{dayLabel}</div>
                         )}
 
-                        <div className={styles.eventCard}>
+                        <div
+                            className={styles.eventCard}
+                            onClick={() => onEventClick?.(event)}
+                            style={{ cursor: "pointer" }}
+                        >
                             <div className={styles.banner}>
                                 {event.banner ? (
                                     <Image

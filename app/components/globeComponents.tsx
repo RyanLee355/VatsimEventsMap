@@ -1,28 +1,39 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import dynamic from 'next/dynamic';
 import { Pilot, Ring, Route } from '@/app/types';
 // Only load react-globe.gl on the client
 const Globe = dynamic(() => import('react-globe.gl'), { ssr: false });
 
-export default function GlobeComponent({
-    routes,
-    rings,
-    airportPoints,
-    pilotData,
-    dayNightMode,
-}: {
+export type GlobeHandle = {
+    flyTo: (lat: number, lng: number, altitude?: number) => void;
+};
+
+const GlobeComponent = forwardRef<GlobeHandle, {
     routes: Route[];
     rings: Ring[];
     airportPoints: any[];
     pilotData: Pilot[];
     dayNightMode: boolean;
-}) {
+}>(({ routes, rings, airportPoints, pilotData, dayNightMode }, ref) => {
+
     const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [hoveredArc, setHoveredArc] = useState<any | null>(null);
     const [hoveredPilot, setHoveredPilot] = useState<any | null>(null);
     const [viewport, setViewport] = useState({ w: 0, h: 0 });
     const [isMobile, setIsMobile] = useState(false);
+    const globeRef = useRef<any>(null);
+
+    useImperativeHandle(ref, () => ({
+        flyTo(lat: number, lng: number, altitude = 1.5) {
+            if (!globeRef.current) return;
+
+            globeRef.current.pointOfView(
+                { lat, lng, altitude },
+                1200 // animation duration (ms)
+            );
+        }
+    }));
 
     useEffect(() => {
         const check = () => setIsMobile(window.innerWidth <= 768);
@@ -77,6 +88,7 @@ export default function GlobeComponent({
             style={{width: "100vw", height: "100vh"}}
         >
             <Globe
+                ref={globeRef}
                 globeImageUrl={dayNightMode ?
                     "//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg"
                     :
@@ -428,4 +440,6 @@ export default function GlobeComponent({
 
         </div>
     );
-}
+});
+
+export default GlobeComponent;
