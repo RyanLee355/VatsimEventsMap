@@ -42,8 +42,8 @@ const eventsMap = new Map<
     }
 >();
 
-    console.log("EventSidePanel received routes:", routes);
-    console.log("EventSidePanel received rings:", rings);
+    // console.log("EventSidePanel received routes:", routes);
+    // console.log("EventSidePanel received rings:", rings);
 
     routes.forEach(r => {
         if (!eventsMap.has(r.eventName)) {
