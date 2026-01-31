@@ -10,7 +10,7 @@ import styles from "./page.module.css";
 import { GlobeHandle } from "./components/globeComponents";
 
 export default function Home() {
-    const ZOOM_LEVEL_WHEN_FLYING_TO_EVENT = 0.8;
+    const ZOOM_LEVEL_WHEN_FLYING_TO_EVENT = 0.25;
 
     const globeRef = useRef<GlobeHandle>(null);
     const [routes, setRoutes] = useState<Route[]>([]);
