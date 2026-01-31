@@ -32,6 +32,7 @@ export function eventToRoutesAndRings(
         start_time: string;
         end_time: string;
         banner: string | null;
+        link: string;
     },
     airportsDb: { [icao: string]: { lat: number; lng: number; name: string } }
 ): { routes: Route[]; rings: Ring[] } {
@@ -100,6 +101,7 @@ export function eventToRoutesAndRings(
                 endTime: new Date(event.end_time),
                 radius: 100000,
                 banner: event.banner,
+                link: event.link,
             });
 
             const offset = 0.05; // visual separation
@@ -117,6 +119,7 @@ export function eventToRoutesAndRings(
                 endTime: new Date(event.end_time),
                 banner: event.banner,
                 airportsInvolved: [`${airport.name} - (${a})`],
+                link: event.link,
             });
         }
 
@@ -153,6 +156,7 @@ export function eventToRoutesAndRings(
                     endTime: new Date(event.end_time),
                     banner: event.banner,
                     airportsInvolved: allIcaosWithNames,
+                    link: event.link,
                 });
             }
         }
@@ -164,6 +168,8 @@ export function eventToRoutesAndRings(
 export function buildRoutesAndRings(events: any[]) {
     const allRoutes: Route[] = [];
     const allRings: Ring[] = [];
+
+    console.log("Building routes and rings from events:", events);
 
     events.forEach(event => {
         const { routes, rings } = eventToRoutesAndRings(event, airportsDb);

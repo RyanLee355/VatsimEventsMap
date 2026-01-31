@@ -38,11 +38,12 @@ const eventsMap = new Map<
         airports: string[];
         coords: { lat: number; lon: number }[];
         banner: string | null;
+        link: string | null;
     }
 >();
 
-    // console.log("EventSidePanel received routes:", routes);
-    // console.log("EventSidePanel received rings:", rings);
+    console.log("EventSidePanel received routes:", routes);
+    console.log("EventSidePanel received rings:", rings);
 
     routes.forEach(r => {
         if (!eventsMap.has(r.eventName)) {
@@ -56,6 +57,7 @@ const eventsMap = new Map<
                     { lat: r.endLat, lon: r.endLng }
                 ],
                 banner: r.banner,
+                link: r.link,
             });
         }
     });
@@ -69,6 +71,7 @@ const eventsMap = new Map<
                 airports: [r.icao],
                 coords: [{ lat: r.lat, lon: r.lng }],
                 banner: r.banner,
+                link: r.link,
             });
         }
     });
@@ -135,6 +138,17 @@ const eventsMap = new Map<
                                 <div className={styles.eventAirports}>
                                     {event.airports.join(", ")}
                                 </div>
+
+                                {event.link && (
+                                    <a
+                                        href={event.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={styles.eventLinkButton}
+                                    >
+                                        More Info
+                                    </a>
+                                )}
                             </div>
 
                         </div>

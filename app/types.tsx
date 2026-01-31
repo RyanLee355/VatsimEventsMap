@@ -12,6 +12,7 @@ export type Route = {
     category: DateCategory;
     startIcao: string;
     endIcao: string;
+    link: string;
 };
 
 export type Ring = {
@@ -25,6 +26,7 @@ export type Ring = {
     banner: string | null;
     category: DateCategory;
     icao: string;
+    link: string;
 };
 
 export type DateCategory =
