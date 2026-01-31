@@ -98,12 +98,11 @@ export function eventToRoutesAndRings(
                 eventName: event.name,
                 startTime: new Date(event.start_time),
                 endTime: new Date(event.end_time),
-                radius: 100000, // in meters, adjust as needed
+                radius: 100000,
                 banner: event.banner,
             });
 
-            const offset = 0.05; // Lat/Long Degs. offset for visual separation
-
+            const offset = 0.05; // visual separation
             routes.push({
                 startIcao: a,
                 endIcao: a,
@@ -111,10 +110,7 @@ export function eventToRoutesAndRings(
                 startLng: airport.lng,
                 endLat: airport.lat,
                 endLng: airport.lng + offset,
-                color: getColorForEvent(
-                    new Date(event.start_time),
-                    new Date(event.end_time)
-                ),
+                color: getColorForEvent(new Date(event.start_time), new Date(event.end_time)),
                 category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
                 eventName: event.name,
                 startTime: new Date(event.start_time),
@@ -123,35 +119,10 @@ export function eventToRoutesAndRings(
                 airportsInvolved: [`${airport.name} - (${a})`],
             });
         }
-    }
-
-    if (event.airports.length === 1) {
-        const a = event.airports[0].icao;
-        const airport = getAirportSafe(a, airportsDb);
-
-        const offset = 0.05; // Lat/Long Degs. offset for visual separation
-
-        routes.push({
-            startIcao: a,
-            endIcao: a,
-            startLat: airport.lat,
-            startLng: airport.lng,
-            endLat: airport.lat,
-            endLng: airport.lng + offset,
-            color: getColorForEvent(
-                new Date(event.start_time),
-                new Date(event.end_time)
-            ),
-            category: getEventDateCategory(new Date(event.start_time), new Date(event.end_time)),
-            eventName: event.name,
-            startTime: new Date(event.start_time),
-            endTime: new Date(event.end_time),
-            banner: event.banner,
-            airportsInvolved: [`${airport.name} - (${a})`],
-        });
 
         return { routes, rings };
     }
+
 
     const seenPairs = new Set<string>();
 

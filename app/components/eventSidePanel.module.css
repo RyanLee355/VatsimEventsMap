@@ -6,7 +6,11 @@
 
 @media (max-width: 768px) {
     :root {
-        --side-panel-width: 250px;
+        --side-panel-width: 350px;
+    }
+
+    .panel {
+        background-color: #000000 !important;
     }
 }
 
@@ -15,7 +19,7 @@
     position: fixed;
     top: 0;
     left: 0;
-    width: 25vw;
+    width: var(--side-panel-width);
     min-width: 250px;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.8);

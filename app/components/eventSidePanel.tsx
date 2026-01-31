@@ -36,13 +36,13 @@ const eventsMap = new Map<
         startTime: Date;
         endTime: Date;
         airports: string[];
-        coords: { lat: number; lon: number }[]; // new field for the globe
+        coords: { lat: number; lon: number }[];
         banner: string | null;
     }
 >();
 
-    console.log("EventSidePanel received routes:", routes);
-    console.log("EventSidePanel received rings:", rings);
+    // console.log("EventSidePanel received routes:", routes);
+    // console.log("EventSidePanel received rings:", rings);
 
     routes.forEach(r => {
         if (!eventsMap.has(r.eventName)) {

@@ -8,10 +8,14 @@ Access the website at [https://vatsim-events-map.vercel.app/](https://vatsim-eve
 - Interactive (Click & Drag)
 - Tooltips (Hover)
     - Includes scheduled event times, dates, and ICAOs.
-- Filters (Time-based)
-- Live pilot display w/ event filter
+- Event Filters
+    - Time-based
+    - Regular Event/Controller Exam
+- Live pilot display w/ ongoing event filter
 - Day/Night Toggle
 - Mobile Compatability
+- Event List Sidebar
+    - Click to auto-pan to event location
 
 ![Version 1.1 of Vatsim Events 3D Map](./public/images/vatsim_events_map_screenshot1.png)
 
