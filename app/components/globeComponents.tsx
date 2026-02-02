@@ -137,7 +137,8 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                 globeImageUrl={dayNightMode ?
                     "/textures/earth-night.jpg"
                     :
-                    "/textures/2k_earth_daymap.jpg"
+                    // "/textures/2k_earth_daymap.jpg"
+                    "/textures/flat_earth_Largest_still_nasa.jpg"
                 }
                 
                 bumpImageUrl="/textures/earth-topology.png"
