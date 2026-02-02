@@ -17,7 +17,7 @@ const GlobeComponent = forwardRef<GlobeHandle, {
     dayNightMode: boolean;
 }>(({ routes, rings, airportPoints, pilotData, dayNightMode }, ref) => {
 
-    const [mousePos, setMousePos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const mousePos = useRef({ x: 0, y: 0 });
     const [hoveredArc, setHoveredArc] = useState<any | null>(null);
     const [hoveredPilot, setHoveredPilot] = useState<any | null>(null);
     const [viewport, setViewport] = useState({ w: 0, h: 0 });
@@ -76,7 +76,8 @@ const GlobeComponent = forwardRef<GlobeHandle, {
         if (isMobile) return;
 
         const handleMouseMove = (e: MouseEvent) => {
-            setMousePos({ x: e.clientX, y: e.clientY });
+            mousePos.current.x = e.clientX;
+            mousePos.current.y = e.clientY;
         };
 
         window.addEventListener('mousemove', handleMouseMove);
@@ -90,17 +91,13 @@ const GlobeComponent = forwardRef<GlobeHandle, {
             <Globe
                 ref={globeRef}
                 globeImageUrl={dayNightMode ?
-                    "//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg"
+                    "/textures/earth-night.jpg"
                     :
                     "/textures/2k_earth_daymap.jpg"
                 }
-
-                // globeImageUrl="//cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg"
-                // globeImageUrl="/textures/8k_earth_nightmap.jpg"
-                // globeImageUrl="/textures/2k_earth_daymap.jpg"
                 
-                bumpImageUrl="//cdn.jsdelivr.net/npm/three-globe/example/img/earth-topology.png"
-                backgroundImageUrl="//cdn.jsdelivr.net/npm/three-globe/example/img/night-sky.png"
+                bumpImageUrl="/textures/earth-topology.png"
+                backgroundImageUrl="/textures/night-sky.png"
                 showGlobe={true}
                 showGraticules={true}
 
@@ -154,7 +151,7 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                 <div
                     style={{
                         position: 'fixed',
-                        ...getTooltipStyle(mousePos.x, mousePos.y, 280),
+                        ...getTooltipStyle(mousePos.current.x, mousePos.current.y, 280),
                         backgroundColor: 'rgba(0, 0, 0, 0.9)',
                         color: '#fff',
                         padding: '12px',
@@ -170,14 +167,14 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                     {/* Banner Image */}
                     {hoveredArc.banner && (
                         <img
-                        src={hoveredArc.banner}
-                        alt={hoveredArc.eventName}
-                        style={{
-                            width: '100%',
-                            borderRadius: '6px',
-                            marginBottom: '8px',
-                            objectFit: 'cover'
-                        }}
+                            src={hoveredArc.banner}
+                            alt={hoveredArc.eventName}
+                            style={{
+                                width: '100%',
+                                borderRadius: '6px',
+                                marginBottom: '8px',
+                                objectFit: 'cover'
+                            }}
                         />
                     )}
 
@@ -240,7 +237,7 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                 <div
                     style={{
                         position: 'fixed',
-                        ...getTooltipStyle(mousePos.x, mousePos.y, 220),
+                        ...getTooltipStyle(mousePos.current.x, mousePos.current.y, 280),
                         backgroundColor: 'rgba(0,0,0,0.85)',
                         color: '#fff',
                         padding: '8px',

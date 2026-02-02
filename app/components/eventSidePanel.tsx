@@ -113,6 +113,7 @@ const eventsMap = new Map<
                                         width={80}
                                         height={80}
                                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                        unoptimized
                                     />
                                 ) : (
                                     <span className={styles.noImage}>No Image</span>
