@@ -1,9 +1,11 @@
 'use client';
-import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle, memo, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Pilot, Ring, Route } from '@/app/types';
+
 // Only load react-globe.gl on the client
-const Globe = dynamic(() => import('react-globe.gl'), { ssr: false });
+const GlobeBase = dynamic(() => import('react-globe.gl'), { ssr: false });
+const MemoGlobe = memo(GlobeBase);
 
 export type GlobeHandle = {
     flyTo: (lat: number, lng: number, altitude?: number) => void;
@@ -51,26 +53,40 @@ const GlobeComponent = forwardRef<GlobeHandle, {
         return () => window.removeEventListener("resize", update);
     }, []);
 
-    function getTooltipStyle(
-        mouseX: number,
-        mouseY: number,
-        tooltipWidth = 280,
-        tooltipHeight = 200
-    ) {
-        const offset = 12;
+    const getTooltipStyle = useCallback(
+        (mouseX: number, mouseY: number, tooltipWidth = 280, tooltipHeight = 200) => {
+            const offset = 12;
+            const placeLeft = mouseX > viewport.w / 2;
+            const placeTop = mouseY > viewport.h / 2;
 
-        const placeLeft = mouseX > viewport.w / 2;
-        const placeTop = mouseY > viewport.h / 2;
+            return {
+                left: placeLeft ? mouseX - tooltipWidth - offset : mouseX + offset,
+                top: placeTop ? mouseY - tooltipHeight - offset : mouseY + offset,
+            };
+        },
+        [viewport]
+    );
 
-        return {
-            left: placeLeft
-                ? mouseX - tooltipWidth - offset
-                : mouseX + offset,
-            top: placeTop
-                ? mouseY - tooltipHeight - offset
-                : mouseY + offset,
+    useEffect(() => {
+        if (isMobile) return;
+
+        let raf = 0;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            if (raf) return;
+            raf = requestAnimationFrame(() => {
+            mousePos.current.x = e.clientX;
+            mousePos.current.y = e.clientY;
+            raf = 0;
+            });
         };
-    }
+
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            if (raf) cancelAnimationFrame(raf);
+        };
+    }, [isMobile]);
 
     useEffect(() => {
         if (isMobile) return;
@@ -84,11 +100,39 @@ const GlobeComponent = forwardRef<GlobeHandle, {
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, [isMobile]);
 
+    const arcColor = useCallback((d: any) => d.color, []);
+    const ringColor = useCallback((d: any) => d.color, []);
+    const pointColor = useCallback(() => "#007900", []);
+
+    const handleArcHover = useCallback(
+    (arc: any) => {
+        if (arc) {
+        setHoveredArc(arc);
+        setHoveredPilot(null);
+        } else if (!isMobile) {
+        setHoveredArc(null);
+        }
+    },
+    [isMobile]
+    );
+
+    const handlePointHover = useCallback(
+    (pilot: any) => {
+        if (pilot) {
+        setHoveredPilot(pilot);
+        setHoveredArc(null);
+        } else if (!isMobile) {
+        setHoveredPilot(null);
+        }
+    },
+    [isMobile]
+    );
+
     return (
         <div
             style={{width: "100vw", height: "100vh"}}
         >
-            <Globe
+            <MemoGlobe
                 ref={globeRef}
                 globeImageUrl={dayNightMode ?
                     "/textures/earth-night.jpg"
@@ -102,22 +146,14 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                 showGraticules={true}
 
                 arcsData={routes}
-                arcColor={(d: any) => d.color}
-                onArcHover={(arc) => {
-                    if (arc) {
-                        setHoveredArc(arc);
-                        setHoveredPilot(null);
-                    } else if (!isMobile) {
-                        // only clear on desktop
-                        setHoveredArc(null);
-                    }
-                }}
+                arcColor={arcColor}
+                onArcHover={handleArcHover}
 
                 ringsData={rings}
                 ringPropagationSpeed={0.02}
                 ringResolution={32}
                 ringMaxRadius={.25}
-                ringColor={(d: any) => d.color}
+                ringColor={ringColor}
                 ringRepeatPeriod={5000}
 
                 labelsData={airportPoints}
@@ -131,19 +167,9 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                 pointLat={(d: any) => d.latitude}
                 pointLng={(d: any) => d.longitude}
                 pointAltitude={(d: any) => 0} // normalize to globe radius
-                pointColor={() => "#007900"} // or color by type/rating
+                pointColor={pointColor} // or color by type/rating
                 pointRadius={0.04}
-                onPointHover={(pilot) => {
-                    if (pilot) {
-                        setHoveredPilot(pilot);
-                        setHoveredArc(null);
-                    } else if (!isMobile) {
-                        // only clear on desktop
-                        setHoveredPilot(null);
-                    }
-                }}
-
-
+                onPointHover={handlePointHover}
             />
 
             {/* Event Tooltip Card */}

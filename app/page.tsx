@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Route, Ring, Pilot, DateCategory } from "@/app/types";
 import { dedupeEventsByEarliest, buildRoutesAndRings } from "@/app/components/events";
 import airportsDb from "@/app/data/airports.json";
@@ -9,8 +9,9 @@ import EventSidePanel from "@/app/components/eventSidePanel";
 import styles from "./page.module.css";
 import { GlobeHandle } from "./components/globeComponents";
 
+const ZOOM_LEVEL_WHEN_FLYING_TO_EVENT = 0.25;
+
 export default function Home() {
-    const ZOOM_LEVEL_WHEN_FLYING_TO_EVENT = 0.25;
 
     const globeRef = useRef<GlobeHandle>(null);
     const [routes, setRoutes] = useState<Route[]>([]);
@@ -101,49 +102,92 @@ export default function Home() {
         name.toLowerCase().includes("exam");
 
     // Filtering
-    const filteredRoutes = routes.filter(r => {
+    const filteredRoutes = useMemo(() => {
+    return routes.filter(r => {
         const exam = isExamEvent(r.eventName);
 
         if (exam && !showExamEvents) return false;
         if (!exam && !showNormalEvents) return false;
 
         if (useDateRange) {
-            return isWithinDateRange(r.startTime, r.endTime);
+        return isWithinDateRange(r.startTime, r.endTime);
         }
 
         return enabledCategories[r.category];
     });
+    }, [routes, showExamEvents, showNormalEvents, useDateRange, dateRange, enabledCategories]);
 
-    const filteredRings = rings.filter(r => {
+    const filteredRings = useMemo(() => {
+    return rings.filter(r => {
         const exam = isExamEvent(r.eventName);
 
         if (exam && !showExamEvents) return false;
         if (!exam && !showNormalEvents) return false;
 
         if (useDateRange) {
-            return isWithinDateRange(r.startTime, r.endTime);
+        return isWithinDateRange(r.startTime, r.endTime);
         }
 
         return enabledCategories[r.category];
     });
+    }, [rings, showExamEvents, showNormalEvents, useDateRange, dateRange, enabledCategories]);
 
-    const usedIcaos = new Set<string>();
-    filteredRoutes.forEach(r => { usedIcaos.add(r.startIcao); usedIcaos.add(r.endIcao); });
-    filteredRings.forEach(r => usedIcaos.add(r.icao));
+    const usedIcaos = useMemo(() => {
+        const set = new Set<string>();
+        filteredRoutes.forEach(r => {
+            set.add(r.startIcao);
+            set.add(r.endIcao);
+        });
+        filteredRings.forEach(r => set.add(r.icao));
+        return set;
+    }, [filteredRoutes, filteredRings]);
 
-    const airportPoints = Object.entries(airportsDb)
-        .filter(([icao]) => usedIcaos.has(icao))
-        .map(([icao, coords]) => ({ lat: coords.lat, lng: coords.lng, label: icao }));
+    const airportPoints = useMemo(() => {
+        return Object.entries(airportsDb)
+            .filter(([icao]) => usedIcaos.has(icao))
+            .map(([icao, coords]) => ({
+                lat: coords.lat,
+                lng: coords.lng,
+                label: icao
+            }));
+    }, [usedIcaos]);
 
     // Filter pilots for ongoing events
-    const ongoingEventIcaos = new Set(filteredRings.filter(r => r.category === 'ongoing').map(r => r.icao));
-    filteredRoutes.filter(r => r.category === 'ongoing').forEach(r => { ongoingEventIcaos.add(r.startIcao); ongoingEventIcaos.add(r.endIcao); });
+    const ongoingEventIcaos = useMemo(() => {
+        const set = new Set<string>();
 
-    const pilotDataFiltered = pilotData.filter(pilot => {
-        if (!pilot.flight_plan) return false;
-        if (!eventPilotToggle) return true;
-        return ongoingEventIcaos.has(pilot.flight_plan.departure) || ongoingEventIcaos.has(pilot.flight_plan.arrival);
-    });
+        filteredRings
+            .filter(r => r.category === "ongoing")
+            .forEach(r => set.add(r.icao));
+
+        filteredRoutes
+            .filter(r => r.category === "ongoing")
+            .forEach(r => {
+                set.add(r.startIcao);
+                set.add(r.endIcao);
+            });
+
+        return set;
+    }, [filteredRoutes, filteredRings]);
+
+    const pilotDataFiltered = useMemo(() => {
+        return pilotData.filter(pilot => {
+            if (!pilot.flight_plan) return false;
+            if (!eventPilotToggle) return true;
+
+            return (
+                ongoingEventIcaos.has(pilot.flight_plan.departure) ||
+                ongoingEventIcaos.has(pilot.flight_plan.arrival)
+            );
+        });
+    }, [pilotData, eventPilotToggle, ongoingEventIcaos]);
+
+    const handleEventClick = useCallback((event: { coords: { lat: number; lon: number; }[]; }) => {
+        const lat = event.coords[0].lat;
+        const lon = event.coords[0].lon;
+        globeRef.current?.flyTo(lat, lon, ZOOM_LEVEL_WHEN_FLYING_TO_EVENT);
+    }, []);
+
 
     return (
         <div className={styles.root}>
@@ -160,11 +204,7 @@ export default function Home() {
                 routes={filteredRoutes}
                 rings={filteredRings}
                 collapsed={panelCollapsed}
-                onEventClick={(event) => {
-                    const lat = event.coords[0].lat;
-                    const lon = event.coords[0].lon;
-                    globeRef.current?.flyTo(lat, lon, ZOOM_LEVEL_WHEN_FLYING_TO_EVENT);
-                }}
+                onEventClick={handleEventClick}
             />
 
             <main>

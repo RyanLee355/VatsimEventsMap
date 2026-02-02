@@ -2,6 +2,7 @@
 import { Route, Ring } from "@/app/types";
 import Image from "next/image";
 import styles from "./eventSidePanel.module.css";
+import { useCallback, useMemo } from "react";
 
 type Props = {
     routes: Route[];
@@ -29,58 +30,61 @@ function getDayLabel(date: Date): string {
 }
 
 export default function EventSidePanel({ routes, rings, collapsed, onEventClick }: Props) {
-const eventsMap = new Map<
-    string,
-    {
-        name: string;
-        startTime: Date;
-        endTime: Date;
-        airports: string[];
-        coords: { lat: number; lon: number }[];
-        banner: string | null;
-        link: string | null;
-    }
->();
+    const events = useMemo(() => {
+        const eventsMap = new Map<
+            string,
+            {
+                name: string;
+                startTime: Date;
+                endTime: Date;
+                airports: string[];
+                coords: { lat: number; lon: number }[];
+                banner: string | null;
+                link: string | null;
+            }
+        >();
 
-    // console.log("EventSidePanel received routes:", routes);
-    // console.log("EventSidePanel received rings:", rings);
-
-    routes.forEach(r => {
-        if (!eventsMap.has(r.eventName)) {
-            eventsMap.set(r.eventName, {
-                name: r.eventName,
-                startTime: r.startTime,
-                endTime: r.endTime,
-                airports: r.airportsInvolved,
-                coords: [
+        routes.forEach(r => {
+            if (!eventsMap.has(r.eventName)) {
+                eventsMap.set(r.eventName, {
+                    name: r.eventName,
+                    startTime: r.startTime,
+                    endTime: r.endTime,
+                    airports: r.airportsInvolved,
+                    coords: [
                     { lat: r.startLat, lon: r.startLng },
                     { lat: r.endLat, lon: r.endLng }
-                ],
-                banner: r.banner,
-                link: r.link,
-            });
-        }
-    });
+                    ],
+                    banner: r.banner,
+                    link: r.link,
+                });
+            }
+        });
 
-    rings.forEach(r => {
-        if (!eventsMap.has(r.eventName)) {
-            eventsMap.set(r.eventName, {
-                name: r.eventName,
-                startTime: r.startTime,
-                endTime: r.endTime,
-                airports: [r.icao],
-                coords: [{ lat: r.lat, lon: r.lng }],
-                banner: r.banner,
-                link: r.link,
-            });
-        }
-    });
+        rings.forEach(r => {
+            if (!eventsMap.has(r.eventName)) {
+                eventsMap.set(r.eventName, {
+                    name: r.eventName,
+                    startTime: r.startTime,
+                    endTime: r.endTime,
+                    airports: [r.icao],
+                    coords: [{ lat: r.lat, lon: r.lng }],
+                    banner: r.banner,
+                    link: r.link,
+                });
+            }
+        });
 
-    const events = Array.from(eventsMap.values()).sort(
-        (a, b) => a.startTime.getTime() - b.startTime.getTime()
+        return Array.from(eventsMap.values()).sort(
+            (a, b) => a.startTime.getTime() - b.startTime.getTime()
+        );
+    }, [routes, rings]);
+
+    const handleEventClick = useCallback(
+        (event: { name: string; airports: string[]; coords: { lat: number; lon: number; }[]; }) => onEventClick?.(event),
+        [onEventClick]
     );
 
-    let lastDayLabel = "";
     return (
         <div
             className={`${styles.panel} ${
@@ -91,8 +95,9 @@ const eventsMap = new Map<
 
             {events.map((event, idx) => {
                 const dayLabel = getDayLabel(event.startTime);
-                const showHeader = dayLabel !== lastDayLabel;
-                lastDayLabel = dayLabel;
+                const prevDayLabel =
+                    idx > 0 ? getDayLabel(events[idx - 1].startTime) : null;
+                const showHeader = dayLabel !== prevDayLabel;
 
                 return (
                     <div key={idx}>
@@ -102,7 +107,7 @@ const eventsMap = new Map<
 
                         <div
                             className={styles.eventCard}
-                            onClick={() => onEventClick?.(event)}
+                            onClick={() => handleEventClick(event)}
                             style={{ cursor: "pointer" }}
                         >
                             <div className={styles.banner}>
@@ -113,6 +118,7 @@ const eventsMap = new Map<
                                         width={80}
                                         height={80}
                                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                        sizes="80px"
                                         unoptimized
                                     />
                                 ) : (
