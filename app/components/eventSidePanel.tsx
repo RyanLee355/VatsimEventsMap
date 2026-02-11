@@ -81,6 +81,7 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
                 coords: { lat: number; lon: number }[];
                 banner: string | null;
                 link: string | null;
+                isWeekly: boolean;
             }
         >();
 
@@ -97,6 +98,7 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
                     ],
                     banner: r.banner,
                     link: r.link,
+                    isWeekly: !!r.isWeekly,
                 });
             }
         });
@@ -111,6 +113,7 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
                     coords: [{ lat: r.lat, lon: r.lng }],
                     banner: r.banner,
                     link: r.link,
+                    isWeekly: !!r.isWeekly,
                 });
             }
         });
@@ -121,7 +124,11 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
     }, [routes, rings]);
 
     const handleEventClick = useCallback(
-        (event: { name: string; airports: string[]; coords: { lat: number; lon: number; }[]; }) => onEventClick?.(event),
+        (event: {
+            name: string;
+            airports: string[];
+            coords: { lat: number; lon: number; }[];
+        }) => onEventClick?.(event),
         [onEventClick]
     );
 
@@ -178,7 +185,18 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
                                 </div>
 
 
-                                <div className={styles.eventName}>{event.name}</div>
+                                <div className={styles.eventName}>
+                                    {event.name}
+                                
+                                    {event.isWeekly && (
+                                        <span className={styles.weeklyWrapper}>
+                                            ⟳
+                                            <span className={styles.weeklyTooltip}>
+                                                Weekly event manually fetched from the VACC website
+                                            </span>
+                                        </span>
+                                    )}
+                                </div>
 
                                 <div className={styles.eventTime}>
                                     {event.startTime.toLocaleString()} → {event.endTime.toLocaleString()}

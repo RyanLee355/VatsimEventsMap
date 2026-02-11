@@ -170,3 +170,38 @@
     border-left-color: #0000ff;
     color: #0000ff;
 }
+
+.weeklyWrapper {
+    position: relative;
+    margin-left: 6px;
+    font-size: 0.85rem;
+    color: #aaa;
+    cursor: help;
+}
+
+.weeklyWrapper:hover {
+    color: #fff;
+}
+
+.weeklyTooltip {
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+
+    background: rgba(0, 0, 0, 0.9);
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 10001;
+}
+
+.weeklyWrapper:hover .weeklyTooltip {
+    opacity: 1;
+}

@@ -8,6 +8,7 @@ import SettingsPanel from "@/app/components/settingsPanel";
 import EventSidePanel from "@/app/components/eventSidePanel";
 import styles from "./page.module.css";
 import { GlobeHandle } from "./components/globeComponents";
+import { FIXED_EVENTS } from "./components/fixedEvents";
 
 const ZOOM_LEVEL_WHEN_FLYING_TO_EVENT = 0.25;
 
@@ -68,13 +69,64 @@ export default function Home() {
 
     useEffect(() => {
         fetch("/api/vatsim/events", { next: { revalidate: 300 } })
-        .then(res => res.json())
-        .then(json => {
-            const dedupedEvents = dedupeEventsByEarliest(json.data);
-            const { allRoutes, allRings } = buildRoutesAndRings(dedupedEvents);
-            setRoutes(allRoutes);
-            setRings(allRings);
-        });
+            .then(res => res.json())
+            .then(json => {
+                const apiEvents = json.data;
+
+                const now = new Date();
+
+                const fixedEvents = FIXED_EVENTS.map(e => {
+                    const todayUtc = new Date(
+                        Date.UTC(
+                            now.getUTCFullYear(),
+                            now.getUTCMonth(),
+                            now.getUTCDate()
+                        )
+                    );
+
+                    const currentWeekday = todayUtc.getUTCDay();
+                    let daysUntil = e.weekday - currentWeekday;
+                    if (daysUntil < 0) daysUntil += 7;
+
+                    const eventDate = new Date(todayUtc);
+                    eventDate.setUTCDate(todayUtc.getUTCDate() + daysUntil);
+
+                    const [sh, sm] = e.startTimeUtc.split(":").map(Number);
+                    const [eh, em] = e.endTimeUtc.split(":").map(Number);
+
+                    const start = new Date(eventDate);
+                    start.setUTCHours(sh, sm, 0, 0);
+
+                    const end = new Date(eventDate);
+                    end.setUTCHours(eh, em, 0, 0);
+
+                    return {
+                        name: e.name,
+                        airports: e.airports.map(icao => ({ icao })),
+                        start_time: start.toISOString(),
+                        end_time: end.toISOString(),
+                        banner: e.banner,
+                        link: e.link,
+                        isWeekly: true,
+                    };
+                });
+
+                // console.log("FIXED EVENTS (after processing):", fixedEvents);
+
+                // Merge API + fixed events
+                const mergedEvents = [...apiEvents, ...fixedEvents];
+                
+                // TODO: FIXED EVENTS can't carry isWeekly through the [...] merge.
+
+                // console.log("Merged events (API + fixed):", mergedEvents);
+                
+                const dedupedEvents = dedupeEventsByEarliest(mergedEvents);
+                // console.log("Deduped events:", dedupedEvents);
+                const { allRoutes, allRings } = buildRoutesAndRings(dedupedEvents);
+
+                setRoutes(allRoutes);
+                setRings(allRings);
+            });
     }, []);
 
     useEffect(() => {

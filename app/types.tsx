@@ -13,6 +13,7 @@ export type Route = {
     startIcao: string;
     endIcao: string;
     link: string;
+    isWeekly: boolean;
 };
 
 export type Ring = {
@@ -27,6 +28,7 @@ export type Ring = {
     category: DateCategory;
     icao: string;
     link: string;
+    isWeekly: boolean;
 };
 
 export type DateCategory =
@@ -128,4 +130,16 @@ export type Server = {
     ident: string;
     hostname: string;
     location: string;
+};
+
+export type FixedEvent = {
+    name: string;
+    weekday: number; // 0 = Sunday (UTC)
+    startTimeUtc: string; // "HH:mm"
+    endTimeUtc: string;
+    airports: string[];
+    coords: { lat: number; lon: number }[];
+    banner: string | null;
+    link: string;
+    description?: string;
 };

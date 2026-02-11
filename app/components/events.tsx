@@ -33,6 +33,7 @@ export function eventToRoutesAndRings(
         end_time: string;
         banner: string | null;
         link: string;
+        isWeekly?: boolean;
     },
     airportsDb: { [icao: string]: { lat: number; lng: number; name: string } }
 ): { routes: Route[]; rings: Ring[] } {
@@ -102,6 +103,7 @@ export function eventToRoutesAndRings(
                 radius: 100000,
                 banner: event.banner,
                 link: event.link,
+                isWeekly: (event as any).isWeekly,
             });
 
             const offset = 0.05; // visual separation
@@ -120,6 +122,7 @@ export function eventToRoutesAndRings(
                 banner: event.banner,
                 airportsInvolved: [`${airport.name} - (${a})`],
                 link: event.link,
+                isWeekly: (event as any).isWeekly,
             });
         }
 
@@ -157,6 +160,7 @@ export function eventToRoutesAndRings(
                     banner: event.banner,
                     airportsInvolved: allIcaosWithNames,
                     link: event.link,
+                    isWeekly: (event as any).isWeekly,
                 });
             }
         }
