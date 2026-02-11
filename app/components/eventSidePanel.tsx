@@ -30,6 +30,46 @@ function getDayLabel(date: Date): string {
 }
 
 export default function EventSidePanel({ routes, rings, collapsed, onEventClick }: Props) {
+    
+    function getEventTimingInfo(startTime: Date, endTime: Date): {
+        className: string;
+        label: string;
+    } {
+        const now = new Date();
+
+        // Ongoing wins
+        if (startTime <= now && endTime >= now) {
+            return { className: "day-ongoing", label: "● Ongoing" };
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const eventDay = new Date(startTime);
+        eventDay.setHours(0, 0, 0, 0);
+
+        const diffDays = Math.floor(
+            (eventDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        if (diffDays === 0)
+            return { className: "day-today", label: "● Today" };
+
+        if (diffDays === 1)
+            return { className: "day-tomorrow", label: "● Tomorrow" };
+
+        if (diffDays === 2)
+            return { className: "day-2", label: "● In 2 days" };
+
+        if (diffDays === 3)
+            return { className: "day-3", label: "● In 3 days" };
+
+        if (diffDays >= 4 && diffDays <= 5)
+            return { className: "day-4-5", label: "● In 4–5 days" };
+
+        return { className: "day-6-plus", label: "● In 6+ days" };
+    }
+
     const events = useMemo(() => {
         const eventsMap = new Map<
             string,
@@ -99,6 +139,8 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
                     idx > 0 ? getDayLabel(events[idx - 1].startTime) : null;
                 const showHeader = dayLabel !== prevDayLabel;
 
+                const timing = getEventTimingInfo(event.startTime, event.endTime);
+
                 return (
                     <div key={idx}>
                         {showHeader && (
@@ -110,6 +152,7 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
                             onClick={() => handleEventClick(event)}
                             style={{ cursor: "pointer" }}
                         >
+
                             <div className={styles.banner}>
                                 {event.banner ? (
                                     <Image
@@ -129,12 +172,11 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
 
                             <div className={styles.eventContent}>
                                 <div className={styles.status}>
-                                    {event.startTime <= new Date() && event.endTime >= new Date() ? (
-                                        <span className={styles.ongoing}>● Ongoing</span>
-                                    ) : (
-                                        <span className={styles.upcoming}>● Upcoming</span>
-                                    )}
+                                    <span className={styles[timing.className]}>
+                                        {timing.label}
+                                    </span>
                                 </div>
+
 
                                 <div className={styles.eventName}>{event.name}</div>
 

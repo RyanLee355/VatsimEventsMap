@@ -61,6 +61,20 @@
     border-radius: 6px;
     background-color: rgba(255, 255, 255, 0.05);
     align-items: center;
+
+    border-left: 4px solid transparent;
+
+    transition:
+        background-color 0.2s ease,
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.eventCard:hover,
+.eventCard:focus-visible {
+    background-color: rgba(255, 255, 255, 0.12);
+    transform: translateX(2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .banner {
@@ -115,4 +129,44 @@
     font-size: 0.75rem;
     margin-top: 4px;
     color: #ccc;
+}
+
+.eventCard {
+    border-left: 4px solid transparent;
+}
+
+/* Reuse same classes for status text */
+.day-ongoing {
+    border-left-color: #00ff00;
+    color: #00ff00;
+}
+
+.day-today {
+    border-left-color: #ffcc00;
+    color: #ffcc00;
+}
+
+.day-tomorrow {
+    border-left-color: #ff8800;
+    color: #ff8800;
+}
+
+.day-2 {
+    border-left-color: #ff4444;
+    color: #ff4444;
+}
+
+.day-3 {
+    border-left-color: #ff00ff;
+    color: #ff00ff;
+}
+
+.day-4-5 {
+    border-left-color: #8800ff;
+    color: #8800ff;
+}
+
+.day-6-plus {
+    border-left-color: #0000ff;
+    color: #0000ff;
 }
