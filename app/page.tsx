@@ -8,7 +8,7 @@ import SettingsPanel from "@/app/components/settingsPanel";
 import EventSidePanel from "@/app/components/eventSidePanel";
 import styles from "./page.module.css";
 import { GlobeHandle } from "./components/globeComponents";
-import { FIXED_EVENTS } from "./components/fixedEvents";
+import { fixedEventsProcessed } from "./components/fixedEvents";
 
 const ZOOM_LEVEL_WHEN_FLYING_TO_EVENT = 0.25;
 
@@ -75,42 +75,8 @@ export default function Home() {
 
                 const now = new Date();
 
-                const fixedEvents = FIXED_EVENTS.map(e => {
-                    const todayUtc = new Date(
-                        Date.UTC(
-                            now.getUTCFullYear(),
-                            now.getUTCMonth(),
-                            now.getUTCDate()
-                        )
-                    );
-
-                    const currentWeekday = todayUtc.getUTCDay();
-                    let daysUntil = e.weekday - currentWeekday;
-                    if (daysUntil < 0) daysUntil += 7;
-
-                    const eventDate = new Date(todayUtc);
-                    eventDate.setUTCDate(todayUtc.getUTCDate() + daysUntil);
-
-                    const [sh, sm] = e.startTimeUtc.split(":").map(Number);
-                    const [eh, em] = e.endTimeUtc.split(":").map(Number);
-
-                    const start = new Date(eventDate);
-                    start.setUTCHours(sh, sm, 0, 0);
-
-                    const end = new Date(eventDate);
-                    end.setUTCHours(eh, em, 0, 0);
-
-                    return {
-                        name: e.name,
-                        airports: e.airports.map(icao => ({ icao })),
-                        start_time: start.toISOString(),
-                        end_time: end.toISOString(),
-                        banner: e.banner,
-                        link: e.link,
-                        isWeekly: true,
-                    };
-                });
-
+                // const fixedEvents = fixedEventsProcessed();
+                const fixedEvents: never[] = []; // KEEP EMPTY FOR NOW, weeek timing fix incomplete.
                 // console.log("FIXED EVENTS (after processing):", fixedEvents);
 
                 // Merge API + fixed events
@@ -150,38 +116,41 @@ export default function Home() {
         return start <= rangeEnd && end >= rangeStart;
     };
 
-    const isExamEvent = (name: string) =>
-        name.toLowerCase().includes("exam");
-
     // Filtering
     const filteredRoutes = useMemo(() => {
-    return routes.filter(r => {
-        const exam = isExamEvent(r.eventName);
+        // Keep inside useMemo to avoid re-defining on every render, since it's used in both routes and rings filtering
+        const isExamEvent = (name: string) => name.toLowerCase().includes("exam");
 
-        if (exam && !showExamEvents) return false;
-        if (!exam && !showNormalEvents) return false;
+        return routes.filter(r => {
+            const exam = isExamEvent(r.eventName);
 
-        if (useDateRange) {
-        return isWithinDateRange(r.startTime, r.endTime);
-        }
+            if (exam && !showExamEvents) return false;
+            if (!exam && !showNormalEvents) return false;
 
-        return enabledCategories[r.category];
-    });
+            if (useDateRange) {
+                return isWithinDateRange(r.startTime, r.endTime);
+            }
+
+            return enabledCategories[r.category];
+        });
     }, [routes, showExamEvents, showNormalEvents, useDateRange, dateRange, enabledCategories]);
 
     const filteredRings = useMemo(() => {
-    return rings.filter(r => {
-        const exam = isExamEvent(r.eventName);
+        // Keep inside useMemo to avoid re-defining on every render, since it's used in both routes and rings filtering
+        const isExamEvent = (name: string) => name.toLowerCase().includes("exam");
 
-        if (exam && !showExamEvents) return false;
-        if (!exam && !showNormalEvents) return false;
+        return rings.filter(r => {
+            const exam = isExamEvent(r.eventName);
 
-        if (useDateRange) {
-        return isWithinDateRange(r.startTime, r.endTime);
-        }
+            if (exam && !showExamEvents) return false;
+            if (!exam && !showNormalEvents) return false;
 
-        return enabledCategories[r.category];
-    });
+            if (useDateRange) {
+                return isWithinDateRange(r.startTime, r.endTime);
+            }
+
+            return enabledCategories[r.category];
+        });
     }, [rings, showExamEvents, showNormalEvents, useDateRange, dateRange, enabledCategories]);
 
     const usedIcaos = useMemo(() => {
