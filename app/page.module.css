@@ -4,6 +4,10 @@
     font-family: monospace;
 }
 
+/* =====================
+   Panel Toggle Button
+   ===================== */
+
 .panelToggle {
     position: fixed;
     top: 20px;
@@ -15,7 +19,7 @@
     padding: 8px 12px;
     border-radius: 4px;
     cursor: pointer;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, background-color 0.2s ease, color 0.2s ease;
 }
 
 .panelOpen {
@@ -25,6 +29,10 @@
 .panelClosed {
     transform: translateX(0);
 }
+
+/* =====================
+   Title
+   ===================== */
 
 .title {
     position: fixed;
@@ -45,4 +53,16 @@
 .subtitle {
     font-size: 0.75rem;
     opacity: 0.7;
+}
+
+/* =====================
+   Light Mode Overrides
+   ===================== */
+
+@media (prefers-color-scheme: light) {
+    .panelToggle {
+        background-color: rgba(255, 255, 255, 0.85);
+        color: #111;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
 }

@@ -264,7 +264,7 @@ export default function Home() {
             <div className={styles.title}>
                 <span style={{ fontWeight: "bold", textAlign: "center" }}>VATSIM EVENTS 3D MAP</span>
                 <span className={styles.subtitle} style={{ textAlign: "center" }}>
-                    Version 1.3 | by Miggle |{" "}
+                    Version 1.4 | by Miggle |{" "}
                     <a href="https://github.com/RyanLee355/VatsimEventsMap">GitHub Repo.</a>
                 </span>
             </div>

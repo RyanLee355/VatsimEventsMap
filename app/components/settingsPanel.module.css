@@ -168,3 +168,73 @@
         background-color: rgba(255,255,255,0.1);
     }
 }
+
+/* =====================
+   Light Mode Overrides
+   ===================== */
+
+@media (prefers-color-scheme: light) {
+
+    /* Floating wrapper stays the same */
+
+    .mobileToggle {
+        background-color: rgba(255, 255, 255, 0.9);
+        color: #111;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .toggleButton {
+        background-color: rgba(255, 255, 255, 0.8);
+        color: #111;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+
+    .section {
+        background-color: rgba(255, 255, 255, 0.8);
+        color: #111;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+
+    .sectionHint {
+        color: #666;
+    }
+
+    .disabledHint {
+        color: #888;
+    }
+
+    .toggleHeader {
+        color: #111;
+    }
+
+    .dateRange label {
+        color: #555;
+    }
+
+    .dateRange input {
+        background-color: #fff;
+        color: #111;
+        border: 1px solid #ccc;
+    }
+
+    .categoryItem {
+        color: #111;
+    }
+
+    .disabledItem {
+        opacity: 0.4;
+    }
+
+    /* Mobile panel specifically */
+    @media (max-width: 768px) {
+        .panel {
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            color: #111;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+        }
+
+        .closeButton:active {
+            background-color: rgba(0,0,0,0.08);
+        }
+    }
+}
