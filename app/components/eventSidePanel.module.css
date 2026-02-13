@@ -1,5 +1,3 @@
-/* EventSidePanel.module.css */
-
 :root {
     --side-panel-width: 25vw;
 }
@@ -61,7 +59,7 @@
     border-radius: 6px;
     background-color: rgba(255, 255, 255, 0.05);
     align-items: center;
-
+    position: relative;
     border-left: 4px solid transparent;
 
     transition:
@@ -131,10 +129,6 @@
     color: #ccc;
 }
 
-.eventCard {
-    border-left: 4px solid transparent;
-}
-
 /* Reuse same classes for status text */
 .day-ongoing {
     border-left-color: #00ff00;
@@ -172,37 +166,57 @@
 }
 
 .weeklyWrapper {
-    position: relative;
-    margin-left: 6px;
-    font-size: 0.85rem;
-    color: #aaa;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    padding: 2px 8px;
+    border-radius: 999px;
+
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+
+    background: rgba(255, 255, 255, 0.08);
+    color: #ccc;
+
     cursor: help;
 }
 
 .weeklyWrapper:hover {
+    background: rgba(255, 255, 255, 0.15);
     color: #fff;
 }
 
 .weeklyTooltip {
     position: absolute;
-    bottom: 120%;
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
+    top: 120%;
+    right: 0;
+
+    max-width: 220px;
+    white-space: normal;
+    line-height: 1.3;
 
     background: rgba(0, 0, 0, 0.9);
     color: #fff;
+
     padding: 6px 8px;
     border-radius: 4px;
+
     font-size: 0.7rem;
 
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
+
     z-index: 10001;
 }
+
 
 .weeklyWrapper:hover .weeklyTooltip {
     opacity: 1;
 }
-

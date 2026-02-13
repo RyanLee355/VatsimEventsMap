@@ -75,8 +75,8 @@ export default function Home() {
 
                 const now = new Date();
 
-                // const fixedEvents = fixedEventsProcessed();
-                const fixedEvents: never[] = []; // KEEP EMPTY FOR NOW, weeek timing fix incomplete.
+                const fixedEvents = fixedEventsProcessed();
+                // const fixedEvents: never[] = []; // KEEP EMPTY FOR NOW, weeek timing fix incomplete.
                 // console.log("FIXED EVENTS (after processing):", fixedEvents);
 
                 // Merge API + fixed events

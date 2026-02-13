@@ -190,9 +190,9 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
                                 
                                     {event.isWeekly && (
                                         <span className={styles.weeklyWrapper}>
-                                            ⟳
+                                            ⟳ Manually Fetched
                                             <span className={styles.weeklyTooltip}>
-                                                Weekly event manually fetched from the VACC website
+                                                This is an event manually fetched from the VACC website. Double check the event's official page to see if it is actually happening.
                                             </span>
                                         </span>
                                     )}
