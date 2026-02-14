@@ -125,6 +125,10 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
         [onEventClick]
     );
 
+    const now = new Date();
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     return (
         <div
             className={`${styles.panel} ${
@@ -134,15 +138,6 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
             <h2 className={styles.title}>Events</h2>
 
             {events.map((event, idx) => {
-                const now = useMemo(() => new Date(), []);
-                const todayStart = useMemo(() => {
-                    const t = new Date();
-                    t.setHours(0, 0, 0, 0);
-                    return t;
-                }, []);
-
-
-
                 const dayLabel = getDayLabel(event.startTime, todayStart);
                 const prevDayLabel =
                     idx > 0 ? getDayLabel(events[idx - 1].startTime, todayStart) : null;
