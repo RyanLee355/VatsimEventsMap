@@ -8,6 +8,10 @@ type Props = {
     routes: Route[];
     rings: Ring[];
     collapsed: boolean;
+    currentTime?: Date;
+    cooldownRemaining?: number;
+    isRefreshing?: boolean;
+    onRefresh?: () => void;
     onEventClick?: (event: {
         name: string;
         airports: string[];
@@ -26,7 +30,17 @@ function getDayLabel(date: Date, todayStart: Date): string {
     return date.toLocaleDateString(undefined, options);
 }
 
-export default function EventSidePanel({ routes, rings, collapsed, onEventClick }: Props) {
+export default function EventSidePanel(
+    {
+        routes,
+        rings,
+        collapsed,
+        currentTime,
+        cooldownRemaining,
+        isRefreshing,
+        onRefresh,
+        onEventClick
+    }: Props) {
     
     function getEventTimingInfo(startTime: Date, endTime: Date, now: Date, todayStart: Date): {
         className: string;
@@ -125,7 +139,7 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
         [onEventClick]
     );
 
-    const now = new Date();
+    const now = currentTime || new Date();
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -135,7 +149,25 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
                 collapsed ? styles.panelCollapsed : styles.panelOpen
             }`}
         >
-            <h2 className={styles.title}>Events</h2>
+            <div className={styles.titleRow}>
+                <h2 className={styles.title}>Events</h2>
+
+                    <button
+                        onClick={onRefresh}
+                        className={styles.refreshButton}
+                        disabled={isRefreshing || (cooldownRemaining ?? 0) > 0}
+                        title={
+                            (cooldownRemaining ?? 0) > 0
+                                ? `Wait ${cooldownRemaining}s`
+                                : "Refresh events"
+                        }
+                    >
+                        Refresh <span className={styles.refreshIcon}>⟳</span>
+                        {(cooldownRemaining ?? 0) > 0 && ` (${cooldownRemaining}s)`}
+                    </button>
+
+            </div>
+
 
             {events.map((event, idx) => {
                 const dayLabel = getDayLabel(event.startTime, todayStart);

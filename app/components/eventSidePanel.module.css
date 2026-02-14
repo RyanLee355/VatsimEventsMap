@@ -220,3 +220,31 @@
 .weeklyWrapper:hover .weeklyTooltip {
     opacity: 1;
 }
+
+.titleRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.refreshButton {
+    background: none;
+    color: #fff; /* white text for dark background */
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.refreshButton:hover:not(:disabled) {
+    background-color: #4da6ff;
+    color: #000; /* black text on blue hover */
+}
+
+.refreshButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: none;
+    color: #999;
+}

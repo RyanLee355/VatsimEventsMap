@@ -11,6 +11,7 @@ import { GlobeHandle } from "./components/globeComponents";
 import { fixedEventsProcessed } from "./components/fixedEvents";
 
 const ZOOM_LEVEL_WHEN_FLYING_TO_EVENT = 0.25;
+const REFRESH_COOLDOWN_SECONDS = 30;
 
 export default function Home() {
 
@@ -41,6 +42,9 @@ export default function Home() {
     });
     const [showNormalEvents, setShowNormalEvents] = useState(true);
     const [showExamEvents, setShowExamEvents] = useState(true);
+    const [currentTime, setCurrentTime] = useState(new Date());
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
     const toggleNormalEvents = () => {
         setShowNormalEvents(prev => {
@@ -67,21 +71,64 @@ export default function Home() {
         setPanelCollapsed(isMobile);
     }, []);
 
-    useEffect(() => {
-        Promise.all([
+    const fetchEvents = useCallback(async () => {
+        const [eventsJson, dataJson] = await Promise.all([
             fetch("/api/vatsim/events", { next: { revalidate: 300 } }).then(r => r.json()),
             fetch("/api/vatsim/data", { next: { revalidate: 15 } }).then(r => r.json())
-        ]).then(([eventsJson, dataJson]) => {
-            const apiEvents = eventsJson.data;
-            const fixedEvents = fixedEventsProcessed();
-            const mergedEvents = [...apiEvents, ...fixedEvents];
-            const dedupedEvents = dedupeEventsByEarliest(mergedEvents);
-            const { allRoutes, allRings } = buildRoutesAndRings(dedupedEvents);
+        ]);
 
-            setRoutes(allRoutes);
-            setRings(allRings);
-            setPilotData(dataJson.pilots);
-        });
+        const apiEvents = eventsJson.data;
+        const fixedEvents = fixedEventsProcessed();
+        const mergedEvents = [...apiEvents, ...fixedEvents];
+        const dedupedEvents = dedupeEventsByEarliest(mergedEvents);
+        const { allRoutes, allRings } = buildRoutesAndRings(dedupedEvents);
+
+        setRoutes(allRoutes);
+        setRings(allRings);
+        setPilotData(dataJson.pilots);
+    }, []);
+
+    useEffect(() => {
+        fetchEvents();
+    }, [fetchEvents]);
+
+    const handleRefresh = useCallback(async () => {
+        if (isRefreshing || cooldownRemaining > 0) return;
+
+        try {
+            setIsRefreshing(true);
+            setCurrentTime(new Date());
+            await fetchEvents();
+
+            // Start cooldown
+            setCooldownRemaining(REFRESH_COOLDOWN_SECONDS);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [fetchEvents, isRefreshing, cooldownRemaining]);
+
+    useEffect(() => {
+        if (cooldownRemaining <= 0) return;
+
+        const interval = setInterval(() => {
+            setCooldownRemaining(prev => {
+                if (prev <= 1) {
+                    clearInterval(interval);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [cooldownRemaining]);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 60000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const toggleCategory = (cat: DateCategory) => setEnabledCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
@@ -90,19 +137,14 @@ export default function Home() {
     const toggleDayNight = () => setDayNightToggle(prev => !prev);
 
     const isWithinDateRange = useCallback((start: Date, end: Date) => {
-        const parsedDateRange = useMemo(() => {
-            if (!useDateRange || !dateRange.start || !dateRange.end) return null;
+        if (!useDateRange || !dateRange.start || !dateRange.end) return true;
 
-            return {
-                start: new Date(dateRange.start),
-                end: new Date(dateRange.end)
-            };
-        }, [useDateRange, dateRange]);
+        const rangeStart = new Date(dateRange.start);
+        const rangeEnd = new Date(dateRange.end);
 
-        if (!parsedDateRange) return true;
-        return start <= parsedDateRange.end && end >= parsedDateRange.start;
-
+        return start <= rangeEnd && end >= rangeStart;
     }, [useDateRange, dateRange]);
+
 
     // Filtering
 
@@ -208,8 +250,13 @@ export default function Home() {
                 routes={filteredRoutes}
                 rings={filteredRings}
                 collapsed={panelCollapsed}
+                currentTime={currentTime}
+                onRefresh={handleRefresh}
+                cooldownRemaining={cooldownRemaining}
+                isRefreshing={isRefreshing}
                 onEventClick={handleEventClick}
             />
+
 
             <main>
                 <GlobeWrapper
