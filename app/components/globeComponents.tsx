@@ -5,7 +5,6 @@ import { Pilot, Ring, Route } from '@/app/types';
 
 // Only load react-globe.gl on the client
 const GlobeBase = dynamic(() => import('react-globe.gl'), { ssr: false });
-const MemoGlobe = memo(GlobeBase);
 
 export type GlobeHandle = {
     flyTo: (lat: number, lng: number, altitude?: number) => void;
@@ -38,20 +37,19 @@ const GlobeComponent = forwardRef<GlobeHandle, {
     }));
 
     useEffect(() => {
-        const check = () => setIsMobile(window.innerWidth <= 768);
-        check();
-        window.addEventListener("resize", check);
-        return () => window.removeEventListener("resize", check);
+        const handleResize = () => {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+
+            setIsMobile(w <= 768);
+            setViewport({ w, h });
+        };
+
+        handleResize();
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    useEffect(() => {
-        const update = () =>
-            setViewport({ w: window.innerWidth, h: window.innerHeight });
-
-        update();
-        window.addEventListener("resize", update);
-        return () => window.removeEventListener("resize", update);
-    }, []);
 
     const getTooltipStyle = useCallback(
         (mouseX: number, mouseY: number, tooltipWidth = 280, tooltipHeight = 200) => {
@@ -88,51 +86,56 @@ const GlobeComponent = forwardRef<GlobeHandle, {
         };
     }, [isMobile]);
 
-    useEffect(() => {
-        if (isMobile) return;
-
-        const handleMouseMove = (e: MouseEvent) => {
-            mousePos.current.x = e.clientX;
-            mousePos.current.y = e.clientY;
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, [isMobile]);
-
     const arcColor = useCallback((d: any) => d.color, []);
     const ringColor = useCallback((d: any) => d.color, []);
     const pointColor = useCallback(() => "#007900", []);
 
     const handleArcHover = useCallback(
-    (arc: any) => {
-        if (arc) {
-        setHoveredArc(arc);
-        setHoveredPilot(null);
-        } else if (!isMobile) {
-        setHoveredArc(null);
-        }
-    },
-    [isMobile]
+        (arc: any) => {
+            setHoveredPilot(null);
+
+            setHoveredArc((prev: any) => {
+            if (prev === arc) return prev;
+                return arc;
+            });
+        },
+        []
     );
 
+
     const handlePointHover = useCallback(
-    (pilot: any) => {
-        if (pilot) {
-        setHoveredPilot(pilot);
-        setHoveredArc(null);
-        } else if (!isMobile) {
-        setHoveredPilot(null);
-        }
-    },
-    [isMobile]
+        (pilot: any) => {
+            if (pilot) {
+                setHoveredPilot(pilot);
+                setHoveredArc(null);
+            } else if (!isMobile) {
+                setHoveredPilot(null);
+            }
+        },
+        [isMobile]
     );
+
+    const getDateTag = useCallback((startTime: Date) => {
+        const now = new Date();
+        const start = new Date(startTime);
+
+        const diff =
+            new Date(start.setHours(0,0,0,0)).getTime() -
+            new Date(now.setHours(0,0,0,0)).getTime();
+
+        const diffDays = Math.round(diff / 86400000);
+
+        if (diffDays === 0) return "Today";
+        if (diffDays === 1) return "Tomorrow";
+        if (diffDays > 1) return `In ${diffDays} Days`;
+        return `${Math.abs(diffDays)} Days Ago`;
+    }, []);
 
     return (
         <div
             style={{width: "100vw", height: "100vh"}}
         >
-            <MemoGlobe
+            <GlobeBase
                 ref={globeRef}
                 globeImageUrl={dayNightMode ?
                     "/textures/earth-night.jpg"
@@ -207,35 +210,20 @@ const GlobeComponent = forwardRef<GlobeHandle, {
 
                     {/* Tags */}
                     {/* 1. Date Tag */}
-                    {hoveredArc.startTime && (() => {
-                        const now = new Date();
-                        const startDate = new Date(hoveredArc.startTime);
-                        const diffTime = startDate.setHours(0,0,0,0) - now.setHours(0,0,0,0);
-                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-                        let dateTag = '';
-                        if (diffDays === 0) dateTag = 'Today';
-                        else if (diffDays === 1) dateTag = 'Tomorrow';
-                        else if (diffDays > 1) dateTag = `In ${diffDays} Days`;
-                        else dateTag = `${Math.abs(diffDays)} Days Ago`;
-
-                        return (
-                            <div
-                                style={{
-                                    display: 'inline-block',
-                                    backgroundColor: hoveredArc.color[0],
-                                    color: 'lightgray',
-                                    fontWeight: 'bold',
-                                    fontSize: '0.75rem',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    marginBottom: '4px'
-                                }}
-                            >
-                                {dateTag}
-                            </div>
-                        );
-                    })()}
+                    <div
+                        style={{
+                            display: 'inline-block',
+                            backgroundColor: hoveredArc.color[0],
+                            color: 'lightgray',
+                            fontWeight: 'bold',
+                            fontSize: '0.75rem',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            marginBottom: '4px'
+                        }}
+                    >
+                        {getDateTag(hoveredArc.startTime)}
+                    </div>
 
                     {/* Event Name */}
                     <div style={{ fontWeight: 'bold', fontSize: '1rem', marginBottom: '4px' }}>

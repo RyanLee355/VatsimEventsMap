@@ -15,11 +15,8 @@ type Props = {
     }) => void;
 };
 
-function getDayLabel(date: Date): string {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const diffMs = date.getTime() - today.getTime();
+function getDayLabel(date: Date, todayStart: Date): string {
+    const diffMs = date.getTime() - todayStart.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)); // <-- FLOOR instead of ROUND
 
     if (diffDays === 0) return "Today";
@@ -31,20 +28,16 @@ function getDayLabel(date: Date): string {
 
 export default function EventSidePanel({ routes, rings, collapsed, onEventClick }: Props) {
     
-    function getEventTimingInfo(startTime: Date, endTime: Date): {
+    function getEventTimingInfo(startTime: Date, endTime: Date, now: Date, todayStart: Date): {
         className: string;
         label: string;
     } {
-        const now = new Date();
-
         // Ongoing wins
         if (startTime <= now && endTime >= now) {
             return { className: "day-ongoing", label: "● Ongoing" };
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
+        const today = todayStart;
         const eventDay = new Date(startTime);
         eventDay.setHours(0, 0, 0, 0);
 
@@ -141,12 +134,21 @@ export default function EventSidePanel({ routes, rings, collapsed, onEventClick 
             <h2 className={styles.title}>Events</h2>
 
             {events.map((event, idx) => {
-                const dayLabel = getDayLabel(event.startTime);
+                const now = useMemo(() => new Date(), []);
+                const todayStart = useMemo(() => {
+                    const t = new Date();
+                    t.setHours(0, 0, 0, 0);
+                    return t;
+                }, []);
+
+
+
+                const dayLabel = getDayLabel(event.startTime, todayStart);
                 const prevDayLabel =
-                    idx > 0 ? getDayLabel(events[idx - 1].startTime) : null;
+                    idx > 0 ? getDayLabel(events[idx - 1].startTime, todayStart) : null;
                 const showHeader = dayLabel !== prevDayLabel;
 
-                const timing = getEventTimingInfo(event.startTime, event.endTime);
+                const timing = getEventTimingInfo(event.startTime, event.endTime, now, todayStart);
 
                 return (
                     <div key={idx}>

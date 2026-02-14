@@ -5,7 +5,7 @@ const FIXED_EVENTS = [
         weekday: 2, // Tuesday UTC
         startTimeUtc: "19:00",
         endTimeUtc: "21:00",
-        airports: ["LSZH", "LSGG", "LFSB"],
+        airports: ["LSZH"],
         banner: "/images/events/zurich-night.png",
         link: "https://vacc.ch",
         intervalWeeks: 1, // weekly

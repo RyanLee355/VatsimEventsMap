@@ -92,7 +92,7 @@ export function eventToRoutesAndRings(
 
         if (airport.found) {
             rings.push({
-                icao: a,
+                icao: a.toUpperCase(),
                 lat: airport.lat,
                 lng: airport.lng,
                 color: getColorForEvent(new Date(event.start_time), new Date(event.end_time)),
@@ -108,8 +108,8 @@ export function eventToRoutesAndRings(
 
             const offset = 0.05; // visual separation
             routes.push({
-                startIcao: a,
-                endIcao: a,
+                startIcao: a.toUpperCase(),
+                endIcao: a.toUpperCase(),
                 startLat: airport.lat,
                 startLng: airport.lng,
                 endLat: airport.lat,

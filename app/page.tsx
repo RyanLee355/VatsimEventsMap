@@ -68,37 +68,20 @@ export default function Home() {
     }, []);
 
     useEffect(() => {
-        fetch("/api/vatsim/events", { next: { revalidate: 300 } })
-            .then(res => res.json())
-            .then(json => {
-                const apiEvents = json.data;
+        Promise.all([
+            fetch("/api/vatsim/events", { next: { revalidate: 300 } }).then(r => r.json()),
+            fetch("/api/vatsim/data", { next: { revalidate: 15 } }).then(r => r.json())
+        ]).then(([eventsJson, dataJson]) => {
+            const apiEvents = eventsJson.data;
+            const fixedEvents = fixedEventsProcessed();
+            const mergedEvents = [...apiEvents, ...fixedEvents];
+            const dedupedEvents = dedupeEventsByEarliest(mergedEvents);
+            const { allRoutes, allRings } = buildRoutesAndRings(dedupedEvents);
 
-                const now = new Date();
-
-                const fixedEvents = fixedEventsProcessed();
-                // const fixedEvents: never[] = []; // KEEP EMPTY FOR NOW, weeek timing fix incomplete.
-                // console.log("FIXED EVENTS (after processing):", fixedEvents);
-
-                // Merge API + fixed events
-                const mergedEvents = [...apiEvents, ...fixedEvents];
-                
-                // TODO: FIXED EVENTS can't carry isWeekly through the [...] merge.
-
-                // console.log("Merged events (API + fixed):", mergedEvents);
-                
-                const dedupedEvents = dedupeEventsByEarliest(mergedEvents);
-                // console.log("Deduped events:", dedupedEvents);
-                const { allRoutes, allRings } = buildRoutesAndRings(dedupedEvents);
-
-                setRoutes(allRoutes);
-                setRings(allRings);
-            });
-    }, []);
-
-    useEffect(() => {
-        fetch("/api/vatsim/data", { next: { revalidate: 15 } })
-        .then(res => res.json())
-        .then(json => setPilotData(json.pilots));
+            setRoutes(allRoutes);
+            setRings(allRings);
+            setPilotData(dataJson.pilots);
+        });
     }, []);
 
     const toggleCategory = (cat: DateCategory) => setEnabledCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
@@ -106,52 +89,52 @@ export default function Home() {
     const togglePilotsEvent = () => setEventPilotToggle(prev => !prev);
     const toggleDayNight = () => setDayNightToggle(prev => !prev);
 
-    const isWithinDateRange = (start: Date, end: Date) => {
-        if (!useDateRange || !dateRange.start || !dateRange.end) return true;
+    const isWithinDateRange = useCallback((start: Date, end: Date) => {
+        const parsedDateRange = useMemo(() => {
+            if (!useDateRange || !dateRange.start || !dateRange.end) return null;
 
-        const rangeStart = new Date(dateRange.start);
-        const rangeEnd = new Date(dateRange.end);
+            return {
+                start: new Date(dateRange.start),
+                end: new Date(dateRange.end)
+            };
+        }, [useDateRange, dateRange]);
 
-        // Event overlaps the selected range
-        return start <= rangeEnd && end >= rangeStart;
-    };
+        if (!parsedDateRange) return true;
+        return start <= parsedDateRange.end && end >= parsedDateRange.start;
+
+    }, [useDateRange, dateRange]);
 
     // Filtering
-    const filteredRoutes = useMemo(() => {
-        // Keep inside useMemo to avoid re-defining on every render, since it's used in both routes and rings filtering
-        const isExamEvent = (name: string) => name.toLowerCase().includes("exam");
 
-        return routes.filter(r => {
-            const exam = isExamEvent(r.eventName);
+    const passesEventFilters = useCallback((
+        eventName: string,
+        category: DateCategory,
+        startTime: Date,
+        endTime: Date
+    ) => {
+        const exam = eventName.toLowerCase().includes("exam");
 
-            if (exam && !showExamEvents) return false;
-            if (!exam && !showNormalEvents) return false;
+        if (exam && !showExamEvents) return false;
+        if (!exam && !showNormalEvents) return false;
 
-            if (useDateRange) {
-                return isWithinDateRange(r.startTime, r.endTime);
-            }
+        if (useDateRange) {
+            return isWithinDateRange(startTime, endTime);
+        }
 
-            return enabledCategories[r.category];
-        });
-    }, [routes, showExamEvents, showNormalEvents, useDateRange, dateRange, enabledCategories]);
+        return enabledCategories[category];
+    }, [showExamEvents, showNormalEvents, useDateRange, dateRange, enabledCategories]);
 
-    const filteredRings = useMemo(() => {
-        // Keep inside useMemo to avoid re-defining on every render, since it's used in both routes and rings filtering
-        const isExamEvent = (name: string) => name.toLowerCase().includes("exam");
+    const filteredRoutes = useMemo(() =>
+        routes.filter(r =>
+            passesEventFilters(r.eventName, r.category, r.startTime, r.endTime)
+        ),
+    [routes, passesEventFilters]);
 
-        return rings.filter(r => {
-            const exam = isExamEvent(r.eventName);
-
-            if (exam && !showExamEvents) return false;
-            if (!exam && !showNormalEvents) return false;
-
-            if (useDateRange) {
-                return isWithinDateRange(r.startTime, r.endTime);
-            }
-
-            return enabledCategories[r.category];
-        });
-    }, [rings, showExamEvents, showNormalEvents, useDateRange, dateRange, enabledCategories]);
+    const filteredRings = useMemo(() =>
+        rings.filter(r =>
+            passesEventFilters(r.eventName, r.category, r.startTime, r.endTime)
+        ),
+    [rings, passesEventFilters]);
 
     const usedIcaos = useMemo(() => {
         const set = new Set<string>();
