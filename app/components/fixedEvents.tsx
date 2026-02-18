@@ -21,7 +21,16 @@ const FIXED_EVENTS = [
         intervalWeeks: 2, // bi-weekly
         anchorWeek: "2024-01-19", // first known occurrence (UTC)
     },
-
+    {
+        name: "Munich Wednesday",
+        weekday: 3, // Wednesday UTC
+        startTimeUtc: "17:30",
+        endTimeUtc: "20:30",
+        airports: ["EDDM"],
+        banner: "/images/events/munich-wednesday.png",
+        link: "https://vatsim-germany.org/events/view",
+        intervalWeeks: 1, // weekly
+    },
 ];
 
 export const fixedEventsProcessed = () => {
