@@ -9,15 +9,60 @@ import EventSidePanel from "@/app/components/eventSidePanel";
 import styles from "./page.module.css";
 import { GlobeHandle } from "./components/globeComponents";
 import { fixedEventsProcessed } from "./components/fixedEvents";
+import PlannerPanel from "@/app/components/PlannerPanel";
+import type { LatLng, PlannerEventLike } from "@/app/components/LandingPlanner";
 
 const ZOOM_LEVEL_WHEN_FLYING_TO_EVENT = 0.25;
 const REFRESH_COOLDOWN_SECONDS = 30;
+
+type PlannerEvent = PlannerEventLike & { key: string };
+
+const eventKey = (name: string, start: Date | string | number) =>
+    `${name}|${new Date(start).getTime()}`;
+
+// Module-level so its identity is stable
+const getAirport = (icao: string): LatLng | undefined =>
+    (airportsDb as Record<string, { lat: number; lng: number }>)[icao];
 
 export default function Home() {
 
     const globeRef = useRef<GlobeHandle>(null);
     const [routes, setRoutes] = useState<Route[]>([]);
     const [rings, setRings] = useState<Ring[]>([]);
+    const [activePanel, setActivePanel] = useState<"settings" | "planner" | null>(null);
+    const panelOpenHandler = (name: "settings" | "planner") => (open: boolean) =>
+        setActivePanel(prev => (open ? name : prev === name ? null : prev));
+
+    // One planner event per real event, merged from its routes and rings
+    const plannerEvents = useMemo<PlannerEvent[]>(() => {
+        const map = new Map<string, PlannerEvent>();
+        const upsert = (
+            name: string, start: Date, end: Date, color: any,
+            icaos: (string | undefined)[]
+        ) => {
+            const key = eventKey(name, start);
+            let ev = map.get(key);
+            if (!ev) {
+                ev = { key, eventName: name, startTime: start, endTime: end, color, airportsInvolved: [] };
+                map.set(key, ev);
+            }
+            for (const i of icaos) if (i && !ev.airportsInvolved.includes(i)) ev.airportsInvolved.push(i);
+        };
+        routes.forEach(r =>
+            upsert(r.eventName, r.startTime, r.endTime, (r as any).color,
+                [r.startIcao, r.endIcao, ...((r as any).airportsInvolved ?? [])]));
+        rings.forEach(r =>
+            upsert(r.eventName, r.startTime, r.endTime, (r as any).color, [r.icao]));
+        return [...map.values()];
+    }, [routes, rings]);
+
+    const [plannerKeys, setPlannerKeys] = useState<Set<string> | null>(null);
+    const handlePlannerMatches = useCallback(
+        (m: Set<PlannerEvent> | null) =>
+            setPlannerKeys(m ? new Set([...m].map(e => e.key)) : null),
+        []
+    );
+
     const [pilotData, setPilotData] = useState<Pilot[]>([]);
     const [pilotToggle, setPilotToggle] = useState(true);
     const [eventPilotToggle, setEventPilotToggle] = useState(false);
@@ -46,6 +91,49 @@ export default function Home() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
+    const SETTINGS_KEY = "vatsim-events-map:settings:v1"; // bump the version if the shape ever changes
+
+    const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+    // Load once on mount (must be in an effect: localStorage doesn't exist during server render)
+    useEffect(() => {
+        try {
+            const raw = localStorage.getItem(SETTINGS_KEY);
+            if (raw) {
+                const s = JSON.parse(raw);
+                if (typeof s.pilotToggle === "boolean") setPilotToggle(s.pilotToggle);
+                if (typeof s.eventPilotToggle === "boolean") setEventPilotToggle(s.eventPilotToggle);
+                if (typeof s.dayNightToggle === "boolean") setDayNightToggle(s.dayNightToggle);
+                if (s.enabledCategories && typeof s.enabledCategories === "object") {
+                    setEnabledCategories(prev => ({ ...prev, ...s.enabledCategories }));
+                }
+                // keep at least one event type on
+                if (typeof s.showNormalEvents === "boolean" && typeof s.showExamEvents === "boolean"
+                    && (s.showNormalEvents || s.showExamEvents)) {
+                    setShowNormalEvents(s.showNormalEvents);
+                    setShowExamEvents(s.showExamEvents);
+                }
+            }
+        } catch { /* corrupted or blocked storage: fall back to defaults */ }
+        setSettingsLoaded(true);
+    }, []);
+
+    // Save whenever a setting changes (but only after loading, so defaults don't overwrite saved values)
+    useEffect(() => {
+        if (!settingsLoaded) return;
+        try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+                pilotToggle,
+                eventPilotToggle,
+                dayNightToggle,
+                enabledCategories,
+                showNormalEvents,
+                showExamEvents,
+            }));
+        } catch { /* storage full or disabled: ignore */ }
+    }, [settingsLoaded, pilotToggle, eventPilotToggle, dayNightToggle, enabledCategories, showNormalEvents, showExamEvents]);
+
+
     const toggleNormalEvents = () => {
         setShowNormalEvents(prev => {
             // If turning OFF the last enabled one, flip exams ON
@@ -65,10 +153,11 @@ export default function Home() {
             return !prev;
         });
     };
-    
+
     useEffect(() => {
         const isMobile = window.matchMedia("(max-width: 768px)").matches;
         setPanelCollapsed(isMobile);
+        setActivePanel(isMobile ? null : "settings");
     }, []);
 
     const fetchEvents = useCallback(async () => {
@@ -154,6 +243,8 @@ export default function Home() {
         startTime: Date,
         endTime: Date
     ) => {
+        if (plannerKeys) return plannerKeys.has(eventKey(eventName, startTime));
+
         const exam = eventName.toLowerCase().includes("exam");
 
         if (exam && !showExamEvents) return false;
@@ -234,7 +325,6 @@ export default function Home() {
         globeRef.current?.flyTo(lat, lon, ZOOM_LEVEL_WHEN_FLYING_TO_EVENT);
     }, []);
 
-
     return (
         <div className={styles.root}>
             <button
@@ -259,15 +349,26 @@ export default function Home() {
 
 
             <main>
-                <GlobeWrapper
-                    ref={globeRef}
-                    routes={filteredRoutes}
-                    rings={filteredRings}
-                    airportPoints={airportPoints}
-                    pilotData={pilotToggle ? pilotDataFiltered : []}
-                    dayNightMode={dayNightToggle}
-                />
+                {settingsLoaded && (
+                    <GlobeWrapper
+                        ref={globeRef}
+                        routes={filteredRoutes}
+                        rings={filteredRings}
+                        airportPoints={airportPoints}
+                        pilotData={pilotToggle ? pilotDataFiltered : []}
+                        dayNightMode={dayNightToggle}
+                    />
+                )}
             </main>
+
+            <PlannerPanel
+                events={plannerEvents}
+                getAirport={getAirport}
+                onFocus={(lat, lng) => globeRef.current?.flyTo(lat, lng, ZOOM_LEVEL_WHEN_FLYING_TO_EVENT)}
+                onMatches={handlePlannerMatches}
+                open={activePanel === "planner"}
+                onOpenChange={panelOpenHandler("planner")}
+            />
 
             <SettingsPanel
                 enabledCategories={enabledCategories}
@@ -288,14 +389,17 @@ export default function Home() {
                 setUseDateRange={setUseDateRange}
                 dateRange={dateRange}
                 setDateRange={setDateRange}
+
+                open={activePanel === "settings"}
+                onOpenChange={panelOpenHandler("settings")}
             />
 
             {/* Title */}
             <div className={styles.title}>
                 <span style={{ fontWeight: "bold", textAlign: "center" }}>VATSIM EVENTS 3D MAP</span>
                 <span className={styles.subtitle} style={{ textAlign: "center" }}>
-                    Version 1.4 | by Miggle |{" "}
-                    <a href="https://github.com/RyanLee355/VatsimEventsMap">GitHub Repo.</a>
+                    Version 1.5 | by Miggle
+                    {/* <a href="https://github.com/RyanLee355/VatsimEventsMap">GitHub Repo.</a> */}
                 </span>
             </div>
         </div>

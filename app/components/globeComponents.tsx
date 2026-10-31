@@ -1,14 +1,358 @@
 'use client';
-import { useEffect, useState, useRef, forwardRef, useImperativeHandle, memo, useCallback } from 'react';
-import dynamic from 'next/dynamic';
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle, useCallback } from 'react';
+import type { Map as MapLibreMap, GeoJSONSource, PointLike } from 'maplibre-gl';
 import { Pilot, Ring, Route } from '@/app/types';
-
-// Only load react-globe.gl on the client
-const GlobeBase = dynamic(() => import('react-globe.gl'), { ssr: false });
 
 export type GlobeHandle = {
     flyTo: (lat: number, lng: number, altitude?: number) => void;
 };
+
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+
+// Vector basemaps (free, no token). Swap for MapTiler / Protomaps / self-hosted if you prefer.
+const STYLE_NIGHT = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+const STYLE_DAY = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
+
+// Ring animation, matching the old react-globe.gl settings:
+// maxRadius 0.25deg (~27.75km), speed 0.02deg/s -> 12.5s lifetime, new ring every 5s.
+const RING_MAX_RADIUS_M = 0.25 * 111_000;
+const RING_LIFETIME_MS = 12_500;
+const RING_REPEAT_MS = 5_000;
+const RING_COUNT = Math.ceil(RING_LIFETIME_MS / RING_REPEAT_MS);
+const RING_FRAME_MS = 40; // ~25fps
+// Screen pixels per metre at zoom 0 (512px tiles): radius_px = metres * 2^zoom / 78271.5
+const RING_PX_AT_ZOOM0 = RING_MAX_RADIUS_M / 78271.5;
+
+const HIT_PADDING_PX = 6; // click/hover tolerance around thin lines and small dots
+
+const SRC_ROUTES = 'routes-src';
+const SRC_RINGS = 'rings-src';
+const SRC_PILOTS = 'pilots-src';
+const SRC_AIRPORTS = 'airports-src';
+const LYR_ROUTES = 'routes-line';
+const LYR_PILOTS = 'pilots-dot';
+const LYR_AIRPORTS = 'airports-label';
+const lyrRing = (i: number) => `rings-${i}`;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+type FC = { type: 'FeatureCollection'; features: any[] };
+const EMPTY_FC: FC = { type: 'FeatureCollection', features: [] };
+
+// Route/ring colors are an array of CSS strings (maplibre parses #rgb, #rrggbb, #rrggbbaa)
+const firstColor = (color: any): string =>
+    Array.isArray(color) ? color[0] ?? '#ffffff' : typeof color === 'string' ? color : '#ffffff';
+
+// react-globe.gl "altitude" (globe radii above surface) -> MapLibre zoom.
+// altitude 1.5 ~ zoom 3, 0.25 ~ zoom 5.6
+const altitudeToZoom = (altitude: number) =>
+    Math.max(0.5, Math.min(18, 3 + Math.log2(1.5 / Math.max(altitude, 0.001))));
+
+const getDateTag = (startTime: Date) => {
+    const now = new Date();
+    const start = new Date(startTime);
+
+    const diff =
+        new Date(start.setHours(0, 0, 0, 0)).getTime() -
+        new Date(now.setHours(0, 0, 0, 0)).getTime();
+
+    const diffDays = Math.round(diff / 86400000);
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays > 1) return `In ${diffDays} Days`;
+    return `${Math.abs(diffDays)} Days Ago`;
+};
+
+// Densified great-circle line (longitudes unwrapped so lines crossing the antimeridian stay continuous)
+function greatCircle(lng1: number, lat1: number, lng2: number, lat2: number, stepDeg = 2): number[][] {
+    const rad = Math.PI / 180;
+    const vec = (lng: number, lat: number) => [
+        Math.cos(lat * rad) * Math.cos(lng * rad),
+        Math.cos(lat * rad) * Math.sin(lng * rad),
+        Math.sin(lat * rad),
+    ];
+    const a = vec(lng1, lat1);
+    const b = vec(lng2, lat2);
+    const dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+    const omega = Math.acos(dot);
+    const sinO = Math.sin(omega);
+    if (omega < 1e-6 || sinO < 1e-9) return [[lng1, lat1], [lng2, lat2]];
+
+    const n = Math.max(2, Math.ceil(omega / rad / stepDeg));
+    const coords: number[][] = [];
+    let prevLng = lng1;
+    for (let k = 0; k <= n; k++) {
+        const t = k / n;
+        const A = Math.sin((1 - t) * omega) / sinO;
+        const B = Math.sin(t * omega) / sinO;
+        const x = A * a[0] + B * b[0];
+        const y = A * a[1] + B * b[1];
+        const z = A * a[2] + B * b[2];
+        let lng = Math.atan2(y, x) / rad;
+        while (lng - prevLng > 180) lng -= 360;
+        while (lng - prevLng < -180) lng += 360;
+        prevLng = lng;
+        coords.push([lng, Math.atan2(z, Math.hypot(x, y)) / rad]);
+    }
+    return coords;
+}
+
+const routesToFC = (routes: Route[]): FC => ({
+    type: 'FeatureCollection',
+    features: routes.map((r: any, i) => ({
+        type: 'Feature',
+        properties: { i, color: firstColor(r.color) },
+        geometry: { type: 'LineString', coordinates: greatCircle(r.startLng, r.startLat, r.endLng, r.endLat) },
+    })),
+});
+
+const ringsToFC = (rings: Ring[]): FC => ({
+    type: 'FeatureCollection',
+    features: rings.map((r: any) => ({
+        type: 'Feature',
+        properties: { color: firstColor(r.color) },
+        geometry: { type: 'Point', coordinates: [r.lng, r.lat] },
+    })),
+});
+
+const pilotsToFC = (pilots: Pilot[]): FC => ({
+    type: 'FeatureCollection',
+    features: pilots.map((p, i) => ({
+        type: 'Feature',
+        properties: { i, heading: Number(p.heading) || 0 },
+        geometry: { type: 'Point', coordinates: [p.longitude, p.latitude] },
+    })),
+});
+
+const airportsToFC = (airports: any[]): FC => ({
+    type: 'FeatureCollection',
+    features: airports.map((a) => ({
+        type: 'Feature',
+        properties: { label: a.label },
+        geometry: { type: 'Point', coordinates: [a.lng, a.lat] },
+    })),
+});
+
+// Ring radius in pixels at a given animation phase (0..1), scaling with zoom
+const ringRadiusExpr = (phase: number): any => [
+    'interpolate', ['exponential', 2], ['zoom'],
+    0, phase * RING_PX_AT_ZOOM0,
+    22, phase * RING_PX_AT_ZOOM0 * 2 ** 22,
+];
+
+// Plane icon (nose pointing north), drawn on a canvas so no image asset is needed.
+// Images are wiped by setStyle, so this runs on every style load too.
+const PLANE_ICON = 'plane-icon';
+const PLANE_PATH =
+    'M32 3 L36 21 L60 38 L60 45 L36 39 L35 52 L43 58 L43 62 L32 59 L21 62 L21 58 L29 52 L28 39 L4 45 L4 38 L28 21 Z';
+
+function addPlaneIcon(map: MapLibreMap) {
+    if (map.hasImage(PLANE_ICON)) return;
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const path = new Path2D(PLANE_PATH);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.stroke(path);
+    ctx.fillStyle = '#19d219';
+    ctx.fill(path);
+    // pixelRatio 4 -> 16px on screen at icon-size 1
+    map.addImage(PLANE_ICON, ctx.getImageData(0, 0, size, size), { pixelRatio: 4 });
+}
+
+// (Re)create all sources and layers. Must run after every style load, because setStyle wipes them.
+function addDataLayers(map: MapLibreMap, fc: { routes: FC; rings: FC; pilots: FC; airports: FC }) {
+    if (!map.getSource(SRC_RINGS)) map.addSource(SRC_RINGS, { type: 'geojson', data: fc.rings });
+    if (!map.getSource(SRC_ROUTES)) map.addSource(SRC_ROUTES, { type: 'geojson', data: fc.routes });
+    if (!map.getSource(SRC_PILOTS)) map.addSource(SRC_PILOTS, { type: 'geojson', data: fc.pilots });
+    if (!map.getSource(SRC_AIRPORTS)) map.addSource(SRC_AIRPORTS, { type: 'geojson', data: fc.airports });
+
+    // Pulsing rings: circle outlines that stay flat on the globe surface
+    for (let i = 0; i < RING_COUNT; i++) {
+        if (map.getLayer(lyrRing(i))) continue;
+        map.addLayer({
+            id: lyrRing(i),
+            type: 'circle',
+            source: SRC_RINGS,
+            paint: {
+                'circle-radius': 0,
+                'circle-opacity': 0,
+                'circle-stroke-color': ['get', 'color'],
+                'circle-stroke-width': 2,
+                'circle-stroke-opacity': 0,
+                'circle-pitch-alignment': 'map',
+                'circle-pitch-scale': 'map',
+            },
+        });
+    }
+
+    if (!map.getLayer(LYR_ROUTES)) {
+        map.addLayer({
+            id: LYR_ROUTES,
+            type: 'line',
+            source: SRC_ROUTES,
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: { 'line-color': ['get', 'color'], 'line-width': 2.5 },
+        });
+    }
+
+    if (!map.getLayer(LYR_PILOTS)) {
+        addPlaneIcon(map);
+        map.addLayer({
+            id: LYR_PILOTS,
+            type: 'symbol',
+            source: SRC_PILOTS,
+            layout: {
+                'icon-image': PLANE_ICON,
+                'icon-rotate': ['get', 'heading'],
+                'icon-rotation-alignment': 'map',
+                'icon-pitch-alignment': 'map',
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true,
+                'icon-size': ['interpolate', ['linear'], ['zoom'], 1, 0.6, 6, 0.9, 10, 1.3],
+            },
+        });
+    }
+
+    if (!map.getLayer(LYR_AIRPORTS)) {
+        // Reuse a font the basemap already serves glyphs for
+        const font =
+            (map.getStyle().layers.find((l: any) => l.type === 'symbol' && l.layout?.['text-font']) as any)
+                ?.layout['text-font'] ?? ['Open Sans Regular'];
+        map.addLayer({
+            id: LYR_AIRPORTS,
+            type: 'symbol',
+            source: SRC_AIRPORTS,
+            layout: {
+                'text-field': ['get', 'label'],
+                'text-font': font,
+                'text-size': 12,
+                'text-anchor': 'bottom',
+                'text-offset': [0, -0.4],
+            },
+            paint: {
+                'text-color': '#ffffff',
+                'text-halo-color': 'rgba(0,0,0,0.8)',
+                'text-halo-width': 1.5,
+            },
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+const formatAlt = (ft: number) =>
+    ft >= 18000
+        ? `FL${String(Math.round(ft / 100)).padStart(3, '0')}`
+        : `${Math.round(ft).toLocaleString()} ft`;
+
+function PilotStat({ label, value }: { label: string; value: string }) {
+    return (
+        <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.65rem', letterSpacing: '0.08em', color: '#8a94a6' }}>{label}</div>
+            <div style={{ fontWeight: 600, fontSize: '0.95rem', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+        </div>
+    );
+}
+
+// Shared by the desktop hover card and the mobile bottom sheet
+function PilotCard({ pilot, padRight = 0 }: { pilot: Pilot; padRight?: number }) {
+    const fp = pilot.flight_plan;
+    const aircraft = fp?.aircraft_faa || fp?.aircraft;
+
+    return (
+        <div style={{ paddingRight: padRight }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 700, fontSize: '1.1rem', letterSpacing: '0.04em' }}>
+                    {pilot.callsign}
+                </span>
+                {aircraft && (
+                    <span
+                        style={{
+                            fontSize: '0.7rem',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            backgroundColor: 'rgba(25,210,25,0.15)',
+                            color: '#5eea5e',
+                            fontWeight: 600,
+                        }}
+                    >
+                        {aircraft}
+                    </span>
+                )}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#9aa4b5', marginTop: '1px' }}>{pilot.name}</div>
+
+            {/* Route */}
+            {fp && (fp.departure || fp.arrival) && (
+                <div
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        margin: '10px 0',
+                        fontWeight: 700,
+                        fontSize: '1.05rem',
+                        letterSpacing: '0.05em',
+                    }}
+                >
+                    <span>{fp.departure || '----'}</span>
+                    <span
+                        style={{
+                            flex: 1,
+                            height: 0,
+                            borderTop: '2px dotted rgba(255,255,255,0.3)',
+                            position: 'relative',
+                        }}
+                    >
+                        <span
+                            style={{
+                                position: 'absolute',
+                                left: '50%',
+                                top: '-9px',
+                                transform: 'translateX(-50%)',
+                                fontSize: '0.8rem',
+                                color: '#19d219',
+                                backgroundColor: 'rgba(12,16,24,0.95)',
+                                padding: '0 4px',
+                            }}
+                        >
+                            ✈
+                        </span>
+                    </span>
+                    <span>{fp.arrival || '----'}</span>
+                </div>
+            )}
+
+            {/* Stats */}
+            <div
+                style={{
+                    display: 'flex',
+                    gap: '12px',
+                    marginTop: fp ? 0 : '10px',
+                    paddingTop: '8px',
+                    borderTop: '1px solid rgba(255,255,255,0.1)',
+                }}
+            >
+                <PilotStat label="ALT" value={formatAlt(pilot.altitude)} />
+                <PilotStat label="GS" value={`${pilot.groundspeed} kt`} />
+                <PilotStat label="HDG" value={`${String(Math.round(pilot.heading) % 360).padStart(3, '0')}°`} />
+            </div>
+        </div>
+    );
+}
 
 const GlobeComponent = forwardRef<GlobeHandle, {
     routes: Route[];
@@ -18,45 +362,54 @@ const GlobeComponent = forwardRef<GlobeHandle, {
     dayNightMode: boolean;
 }>(({ routes, rings, airportPoints, pilotData, dayNightMode }, ref) => {
 
+    const containerRef = useRef<HTMLDivElement>(null);
+    const mapRef = useRef<MapLibreMap | null>(null);
     const mousePos = useRef({ x: 0, y: 0 });
+    const initialDayNight = useRef(dayNightMode);
+
+    // Latest data, readable from map event handlers and from style.load
+    const fcRef = useRef({ routes: EMPTY_FC, rings: EMPTY_FC, pilots: EMPTY_FC, airports: EMPTY_FC });
+    const routesRef = useRef<Route[]>([]);
+    const pilotsRef = useRef<Pilot[]>([]);
+    const ringCountRef = useRef(0);
+    const isMobileRef = useRef(false);
+
+    const [ready, setReady] = useState(false);
     const [hoveredArc, setHoveredArc] = useState<any | null>(null);
     const [hoveredPilot, setHoveredPilot] = useState<any | null>(null);
     const [viewport, setViewport] = useState({ w: 0, h: 0 });
     const [isMobile, setIsMobile] = useState(false);
-    const globeRef = useRef<any>(null);
 
     useImperativeHandle(ref, () => ({
         flyTo(lat: number, lng: number, altitude = 1.5) {
-            if (!globeRef.current) return;
-
-            globeRef.current.pointOfView(
-                { lat, lng, altitude },
-                1200 // animation duration (ms)
-            );
+            mapRef.current?.flyTo({
+                center: [lng, lat],
+                zoom: altitudeToZoom(altitude),
+                duration: 1200,
+                essential: true,
+            });
         }
     }));
 
+    // ---- viewport / mobile detection ----
     useEffect(() => {
         const handleResize = () => {
             const w = window.innerWidth;
             const h = window.innerHeight;
-
             setIsMobile(w <= 768);
+            isMobileRef.current = w <= 768;
             setViewport({ w, h });
         };
-
         handleResize();
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
-
 
     const getTooltipStyle = useCallback(
         (mouseX: number, mouseY: number, tooltipWidth = 280, tooltipHeight = 200) => {
             const offset = 12;
             const placeLeft = mouseX > viewport.w / 2;
             const placeTop = mouseY > viewport.h / 2;
-
             return {
                 left: placeLeft ? mouseX - tooltipWidth - offset : mouseX + offset,
                 top: placeTop ? mouseY - tooltipHeight - offset : mouseY + offset,
@@ -65,115 +418,173 @@ const GlobeComponent = forwardRef<GlobeHandle, {
         [viewport]
     );
 
+    // ---- map init (client only) ----
     useEffect(() => {
-        if (isMobile) return;
-
+        let cancelled = false;
+        let map: MapLibreMap | null = null;
         let raf = 0;
 
-        const handleMouseMove = (e: MouseEvent) => {
-            if (raf) return;
-            raf = requestAnimationFrame(() => {
-            mousePos.current.x = e.clientX;
-            mousePos.current.y = e.clientY;
-            raf = 0;
-            });
-        };
-
-        window.addEventListener('mousemove', handleMouseMove);
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            if (raf) cancelAnimationFrame(raf);
-        };
-    }, [isMobile]);
-
-    const arcColor = useCallback((d: any) => d.color, []);
-    const ringColor = useCallback((d: any) => d.color, []);
-    const pointColor = useCallback(() => "#007900", []);
-
-    const handleArcHover = useCallback(
-        (arc: any) => {
-            setHoveredPilot(null);
-
-            setHoveredArc((prev: any) => {
-            if (prev === arc) return prev;
-                return arc;
-            });
-        },
-        []
-    );
-
-
-    const handlePointHover = useCallback(
-        (pilot: any) => {
-            if (pilot) {
-                setHoveredPilot(pilot);
-                setHoveredArc(null);
-            } else if (!isMobile) {
-                setHoveredPilot(null);
+        const pick = (m: MapLibreMap, point: { x: number; y: number }) => {
+            const box: [PointLike, PointLike] = [
+                [point.x - HIT_PADDING_PX, point.y - HIT_PADDING_PX],
+                [point.x + HIT_PADDING_PX, point.y + HIT_PADDING_PX],
+            ];
+            if (m.getLayer(LYR_PILOTS)) {
+                const f = m.queryRenderedFeatures(box, { layers: [LYR_PILOTS] })[0];
+                if (f) return { kind: 'pilot' as const, item: pilotsRef.current[f.properties.i] };
             }
-        },
-        [isMobile]
-    );
+            if (m.getLayer(LYR_ROUTES)) {
+                const f = m.queryRenderedFeatures(box, { layers: [LYR_ROUTES] })[0];
+                if (f) return { kind: 'arc' as const, item: routesRef.current[f.properties.i] };
+            }
+            return null;
+        };
 
-    const getDateTag = useCallback((startTime: Date) => {
-        const now = new Date();
-        const start = new Date(startTime);
+        (async () => {
+            const maplibre = await import('maplibre-gl');
+            if (cancelled || !containerRef.current) return;
 
-        const diff =
-            new Date(start.setHours(0,0,0,0)).getTime() -
-            new Date(now.setHours(0,0,0,0)).getTime();
+            map = new maplibre.Map({
+                container: containerRef.current,
+                style: initialDayNight.current ? STYLE_NIGHT : STYLE_DAY,
+                center: [10, 25],
+                zoom: 1.8,
+                maxPitch: 60,
+                attributionControl: { compact: true },
+            });
+            const m = map;
 
-        const diffDays = Math.round(diff / 86400000);
+            // Re-applied after every style load (setStyle resets projection, sky and custom layers)
+            m.on('style.load', () => {
+                m.setProjection({ type: 'globe' });
+                try {
+                    m.setSky({
+                        'sky-color': '#000000',
+                        'horizon-color': '#1a3a6e',
+                        'fog-color': '#0b1a33',
+                        'sky-horizon-blend': 0.6,
+                        'horizon-fog-blend': 0.5,
+                        'fog-ground-blend': 0.2,
+                        'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 1, 5, 1, 7, 0],
+                    });
+                } catch { /* sky not supported by this maplibre version */ }
+                addDataLayers(m, fcRef.current);
+            });
 
-        if (diffDays === 0) return "Today";
-        if (diffDays === 1) return "Tomorrow";
-        if (diffDays > 1) return `In ${diffDays} Days`;
-        return `${Math.abs(diffDays)} Days Ago`;
+            // Desktop hover
+            m.on('mousemove', (e) => {
+                if (isMobileRef.current) return;
+                const hit = pick(m, e.point);
+                mousePos.current = { x: e.point.x, y: e.point.y };
+                m.getCanvas().style.cursor = hit ? 'pointer' : '';
+                if (hit?.kind === 'pilot') {
+                    setHoveredPilot(hit.item ?? null);
+                    setHoveredArc(null);
+                } else if (hit?.kind === 'arc') {
+                    setHoveredPilot(null);
+                    setHoveredArc((prev: any) => (prev === hit.item ? prev : hit.item ?? null));
+                } else {
+                    setHoveredPilot(null);
+                    setHoveredArc(null);
+                }
+            });
+
+            // Mobile tap (no hover on touch screens); tapping empty globe closes the sheets
+            m.on('click', (e) => {
+                if (!isMobileRef.current) return;
+                const hit = pick(m, e.point);
+                if (hit?.kind === 'pilot') {
+                    setHoveredPilot(hit.item ?? null);
+                    setHoveredArc(null);
+                } else if (hit?.kind === 'arc') {
+                    setHoveredPilot(null);
+                    setHoveredArc(hit.item ?? null);
+                } else {
+                    setHoveredPilot(null);
+                    setHoveredArc(null);
+                }
+            });
+
+            // Ring animation: only paint properties change per frame, no data re-tiling
+            let last = 0;
+            const tick = (now: number) => {
+                raf = requestAnimationFrame(tick);
+                if (now - last < RING_FRAME_MS) return;
+                last = now;
+                if (!ringCountRef.current) return;
+                for (let i = 0; i < RING_COUNT; i++) {
+                    if (!m.getLayer(lyrRing(i))) continue;
+                    const age = (((now - i * RING_REPEAT_MS) % RING_LIFETIME_MS) + RING_LIFETIME_MS) % RING_LIFETIME_MS;
+                    const phase = Math.max(age / RING_LIFETIME_MS, 0.001);
+                    m.setPaintProperty(lyrRing(i), 'circle-radius', ringRadiusExpr(phase));
+                    m.setPaintProperty(lyrRing(i), 'circle-stroke-opacity', 1 - phase);
+                }
+            };
+            raf = requestAnimationFrame(tick);
+
+            mapRef.current = m;
+            setReady(true);
+        })();
+
+        return () => {
+            cancelled = true;
+            cancelAnimationFrame(raf);
+            setReady(false);
+            map?.remove();
+            mapRef.current = null;
+        };
     }, []);
 
+    // ---- push data into the map ----
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!ready || !map) return;
+
+        const validPilots = pilotData.filter(
+            (p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude)
+        );
+
+        routesRef.current = routes;
+        pilotsRef.current = validPilots;
+        ringCountRef.current = rings.length;
+        fcRef.current = {
+            routes: routesToFC(routes),
+            rings: ringsToFC(rings),
+            pilots: pilotsToFC(validPilots),
+            airports: airportsToFC(airportPoints),
+        };
+
+        // If the style hasn't loaded yet, style.load will pick the data up from fcRef
+        const set = (id: string, data: FC) => (map.getSource(id) as GeoJSONSource | undefined)?.setData(data as any);
+        set(SRC_ROUTES, fcRef.current.routes);
+        set(SRC_RINGS, fcRef.current.rings);
+        set(SRC_PILOTS, fcRef.current.pilots);
+        set(SRC_AIRPORTS, fcRef.current.airports);
+    }, [ready, routes, rings, airportPoints, pilotData]);
+
+    // ---- day / night basemap ----
+    const firstStyleRun = useRef(true);
+    useEffect(() => {
+        if (!ready || !mapRef.current) return;
+        if (firstStyleRun.current) {
+            firstStyleRun.current = false;
+            return; // initial style already set in the constructor
+        }
+        mapRef.current.setStyle(dayNightMode ? STYLE_NIGHT : STYLE_DAY);
+    }, [dayNightMode, ready]);
+
     return (
-        <div
-            style={{width: "100vw", height: "100vh"}}
-        >
-            <GlobeBase
-                ref={globeRef}
-                globeImageUrl={dayNightMode ?
-                    "/textures/earth-night.jpg"
-                    :
-                    // "/textures/2k_earth_daymap.jpg"
-                    "/textures/flat_earth_Largest_still_nasa.jpg"
-                }
-                
-                bumpImageUrl="/textures/earth-topology.png"
-                backgroundImageUrl="/textures/night-sky.png"
-                showGlobe={true}
-                showGraticules={true}
-
-                arcsData={routes}
-                arcColor={arcColor}
-                onArcHover={handleArcHover}
-
-                ringsData={rings}
-                ringPropagationSpeed={0.02}
-                ringResolution={32}
-                ringMaxRadius={.25}
-                ringColor={ringColor}
-                ringRepeatPeriod={5000}
-
-                labelsData={airportPoints}
-                labelText={(d: any) => d.label}
-                labelSize={0.15}
-                labelAltitude={0.0}
-
-                // New layer: pilots as points
-                pointsData={pilotData}
-                pointLabel={(d: any) => ``}
-                pointLat={(d: any) => d.latitude}
-                pointLng={(d: any) => d.longitude}
-                pointAltitude={(d: any) => 0} // normalize to globe radius
-                pointColor={pointColor} // or color by type/rating
-                pointRadius={0.04}
-                onPointHover={handlePointHover}
+        <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+            {/* Map container: starry background shows through behind the globe */}
+            <div
+                ref={containerRef}
+                style={{
+                    position: 'absolute',
+                    inset: 0,
+                    backgroundColor: '#000',
+                    backgroundImage: 'url(/textures/night-sky.png)',
+                    backgroundSize: 'cover',
+                }}
             />
 
             {/* Event Tooltip Card */}
@@ -192,9 +603,7 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                         boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
                         fontFamily: 'sans-serif',
                     }}
-
                 >
-                    {/* Banner Image */}
                     {hoveredArc.banner && (
                         <img
                             src={hoveredArc.banner}
@@ -208,8 +617,6 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                         />
                     )}
 
-                    {/* Tags */}
-                    {/* 1. Date Tag */}
                     <div
                         style={{
                             display: 'inline-block',
@@ -225,12 +632,10 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                         {getDateTag(hoveredArc.startTime)}
                     </div>
 
-                    {/* Event Name */}
                     <div style={{ fontWeight: 'bold', fontSize: '1rem', marginBottom: '4px' }}>
                         {hoveredArc.eventName}
                     </div>
 
-                    {/* Date & Time */}
                     {hoveredArc.startTime && hoveredArc.endTime && (
                         <div style={{ fontSize: '0.85rem', marginBottom: '6px', color: '#ccc' }}>
                             {hoveredArc.startTime.toLocaleString()} -{' '}
@@ -238,12 +643,10 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                         </div>
                     )}
 
-                    {/* Airports Involved */}
                     <div style={{ fontSize: '0.9rem' }}>
                         <strong>Airports:</strong>{' '}
                         {hoveredArc.airportsInvolved.join(', ')}
                     </div>
-
                 </div>
             )}
 
@@ -252,31 +655,26 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                 <div
                     style={{
                         position: 'fixed',
-                        ...getTooltipStyle(mousePos.current.x, mousePos.current.y, 280),
-                        backgroundColor: 'rgba(0,0,0,0.85)',
+                        ...getTooltipStyle(mousePos.current.x, mousePos.current.y, 260),
+                        backgroundColor: 'rgba(12,16,24,0.92)',
+                        backdropFilter: 'blur(6px)',
                         color: '#fff',
-                        padding: '8px',
-                        borderRadius: '6px',
+                        padding: '12px 14px',
+                        borderRadius: '10px',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        borderTop: '2px solid #19d219',
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
                         pointerEvents: 'none',
                         zIndex: 9999,
-                        maxWidth: '220px',
+                        width: '240px',
                         fontFamily: 'sans-serif',
-                        fontSize: '0.85rem',
                     }}
                 >
-                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                        {hoveredPilot.callsign} — {hoveredPilot.name}
-                    </div>
-                    {/* <div>Latitude: {hoveredPilot.latitude.toFixed(4)}</div>
-                    <div>Longitude: {hoveredPilot.longitude.toFixed(4)}</div> */}
-                    <div>ALT: {hoveredPilot.altitude} ft</div>
-                    <div>GS: {hoveredPilot.groundspeed} kt</div>
-                    {hoveredPilot.flight_plan && (
-                        <div>Route: {hoveredPilot.flight_plan.departure} → {hoveredPilot.flight_plan.arrival}</div>
-                    )}
+                    <PilotCard pilot={hoveredPilot} />
                 </div>
             )}
 
+            {/* Mobile event sheet */}
             {hoveredArc && isMobile && (
                 <div
                     style={{
@@ -296,8 +694,6 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                         fontFamily: 'sans-serif',
                     }}
                 >
-
-                    {/* Banner image */}
                     {hoveredArc.banner && (
                         <img
                             src={hoveredArc.banner}
@@ -312,7 +708,6 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                         />
                     )}
 
-                    {/* Close button */}
                     <div
                         style={{
                             position: 'absolute',
@@ -332,64 +727,34 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                         ✕
                     </div>
 
-                    {/* Date tag */}
-                    {hoveredArc.startTime && (() => {
-                        const now = new Date();
-                        const startDate = new Date(hoveredArc.startTime);
-                        const diffTime =
-                            startDate.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0);
-                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                    {hoveredArc.startTime && (
+                        <div
+                            style={{
+                                display: 'inline-block',
+                                backgroundColor: hoveredArc.color[0],
+                                color: 'lightgray',
+                                fontWeight: 'bold',
+                                fontSize: '0.75rem',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                marginBottom: '6px',
+                            }}
+                        >
+                            {getDateTag(hoveredArc.startTime)}
+                        </div>
+                    )}
 
-                        let dateTag = '';
-                        if (diffDays === 0) dateTag = 'Today';
-                        else if (diffDays === 1) dateTag = 'Tomorrow';
-                        else if (diffDays > 1) dateTag = `In ${diffDays} Days`;
-                        else dateTag = `${Math.abs(diffDays)} Days Ago`;
-
-                        return (
-                            <div
-                                style={{
-                                    display: 'inline-block',
-                                    backgroundColor: hoveredArc.color[0],
-                                    color: 'lightgray',
-                                    fontWeight: 'bold',
-                                    fontSize: '0.75rem',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    marginBottom: '6px',
-                                }}
-                            >
-                                {dateTag}
-                            </div>
-                        );
-                    })()}
-
-                    {/* Event name */}
-                    <div
-                        style={{
-                            fontWeight: 'bold',
-                            fontSize: '1.05rem',
-                            marginBottom: '6px',
-                        }}
-                    >
+                    <div style={{ fontWeight: 'bold', fontSize: '1.05rem', marginBottom: '6px' }}>
                         {hoveredArc.eventName}
                     </div>
 
-                    {/* Date & time */}
                     {hoveredArc.startTime && hoveredArc.endTime && (
-                        <div
-                            style={{
-                                fontSize: '0.85rem',
-                                marginBottom: '8px',
-                                color: '#ccc',
-                            }}
-                        >
+                        <div style={{ fontSize: '0.85rem', marginBottom: '8px', color: '#ccc' }}>
                             {hoveredArc.startTime.toLocaleString()} –{' '}
                             {hoveredArc.endTime.toLocaleString()}
                         </div>
                     )}
 
-                    {/* Airports */}
                     <div style={{ fontSize: '0.9rem' }}>
                         <strong>Airports:</strong>{' '}
                         {hoveredArc.airportsInvolved.join(', ')}
@@ -397,7 +762,7 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                 </div>
             )}
 
-
+            {/* Mobile pilot sheet */}
             {hoveredPilot && isMobile && (
                 <div
                     style={{
@@ -415,11 +780,6 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                         fontFamily: 'sans-serif',
                     }}
                 >
-                    <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
-                        {hoveredPilot.callsign} — {hoveredPilot.name}
-                    </div>
-
-                    {/* Close button */}
                     <div
                         style={{
                             position: 'absolute',
@@ -439,19 +799,13 @@ const GlobeComponent = forwardRef<GlobeHandle, {
                         ✕
                     </div>
 
-                    <div>ALT: {hoveredPilot.altitude} ft</div>
-                    <div>GS: {hoveredPilot.groundspeed} kt</div>
-                    {hoveredPilot.flight_plan && (
-                        <div>
-                            Route: {hoveredPilot.flight_plan.departure} → {hoveredPilot.flight_plan.arrival}
-                        </div>
-                    )}
+                    <PilotCard pilot={hoveredPilot} padRight={36} />
                 </div>
             )}
-
-
         </div>
     );
 });
+
+GlobeComponent.displayName = 'GlobeComponent';
 
 export default GlobeComponent;
