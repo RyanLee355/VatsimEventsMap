@@ -33,6 +33,9 @@ export default function Home() {
     const panelOpenHandler = (name: "settings" | "planner") => (open: boolean) =>
         setActivePanel(prev => (open ? name : prev === name ? null : prev));
 
+    const [plannerRange, setPlannerRange] =
+        useState<{ lat: number; lng: number; radiusNm: number } | null>(null);
+
     // One planner event per real event, merged from its routes and rings
     const plannerEvents = useMemo<PlannerEvent[]>(() => {
         const map = new Map<string, PlannerEvent>();
@@ -357,18 +360,10 @@ export default function Home() {
                         airportPoints={airportPoints}
                         pilotData={pilotToggle ? pilotDataFiltered : []}
                         dayNightMode={dayNightToggle}
+                        rangeCircle={plannerRange}
                     />
                 )}
             </main>
-
-            <PlannerPanel
-                events={plannerEvents}
-                getAirport={getAirport}
-                onFocus={(lat, lng) => globeRef.current?.flyTo(lat, lng, ZOOM_LEVEL_WHEN_FLYING_TO_EVENT)}
-                onMatches={handlePlannerMatches}
-                open={activePanel === "planner"}
-                onOpenChange={panelOpenHandler("planner")}
-            />
 
             <SettingsPanel
                 enabledCategories={enabledCategories}
@@ -392,6 +387,16 @@ export default function Home() {
 
                 open={activePanel === "settings"}
                 onOpenChange={panelOpenHandler("settings")}
+            />
+
+            <PlannerPanel
+                events={plannerEvents}
+                getAirport={getAirport}
+                onFocus={(lat, lng) => globeRef.current?.flyTo(lat, lng, ZOOM_LEVEL_WHEN_FLYING_TO_EVENT)}
+                onMatches={handlePlannerMatches}
+                open={activePanel === "planner"}
+                onOpenChange={panelOpenHandler("planner")}
+                onRange={setPlannerRange}
             />
 
             {/* Title */}

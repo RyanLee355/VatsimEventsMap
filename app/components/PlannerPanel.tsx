@@ -20,6 +20,8 @@ type Props<T extends PlannerEventLike> = {
     onFocus?: (lat: number, lng: number) => void;
     /** Receives the set of matching events (or null when the planner isn't filtering the map). */
     onMatches?: (matches: Set<T> | null) => void;
+    /** Receives the reachable-range circle (or null when it shouldn't be drawn). */
+    onRange?: (range: { lat: number; lng: number; radiusNm: number } | null) => void;
 
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -79,6 +81,23 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     );
 }
 
+function Switch({
+    checked, onChange, label, hint,
+}: { checked: boolean; onChange: () => void; label: string; hint?: string }) {
+    return (
+        <button type="button" role="switch" aria-checked={checked}
+            className={styles.switchRow} onClick={onChange}>
+            <span className={styles.switchText}>
+                <span className={styles.switchLabel}>{label}</span>
+                {hint && <span className={styles.switchHint}>{hint}</span>}
+            </span>
+            <span className={`${styles.track} ${checked ? styles.trackOn : ''}`}>
+                <span className={styles.thumb} />
+            </span>
+        </button>
+    );
+}
+
 const PlaneIcon = () => (
     <svg width="18" height="18" viewBox="0 0 64 64" aria-hidden="true" fill="currentColor">
         <path d="M32 3 L36 21 L60 38 L60 45 L36 39 L35 52 L43 58 L43 62 L32 59 L21 62 L21 58 L29 52 L28 39 L4 45 L4 38 L28 21 Z" />
@@ -91,9 +110,9 @@ export default function PlannerPanel<T extends PlannerEventLike>({
     getAirport,
     onFocus,
     onMatches,
+    onRange,
     open,
     onOpenChange,
-
 }: Props<T>) {
 
     const [origin, setOrigin] = useState('EGLL');
@@ -105,6 +124,12 @@ export default function PlannerPanel<T extends PlannerEventLike>({
     const [speed, setSpeed] = useState(450);
     const [buffer, setBuffer] = useState(20);
     const [filterMap, setFilterMap] = useState(true);
+    const [showRange, setShowRange] = useState(true);
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    }, []);
 
     // Avoid SSR/client date mismatch: fill today's date after mount
     useEffect(() => setDate(todayStr(true)), []);
@@ -136,17 +161,38 @@ export default function PlannerPanel<T extends PlannerEventLike>({
             { origin: pos, landFrom, landTo, departAfter, now, speedKt: speed, bufferMin: buffer },
             getAirport
         );
-        return { result, landFrom, icao } as const;
+
+        // Furthest you can get from departure until "Land by", minus the taxi/climb/descent buffer
+        const rangeNm = Math.max(
+            0,
+            (((landTo.getTime() - departAfter.getTime()) / 60_000 - buffer) / 60) * speed
+        );
+        return { result, landFrom, icao, origin: pos, rangeNm } as const;
     }, [events, getAirport, origin, date, from, to, utc, departStr, speed, buffer]);
 
     const result = plan && 'result' in plan ? plan.result : null;
     const ref: Date = (plan && 'landFrom' in plan ? plan.landFrom : undefined) ?? new Date();
+
+    const rangeOrigin = plan && 'origin' in plan ? plan.origin : undefined;
+    const rangeLat = rangeOrigin?.lat ?? null;
+    const rangeLng = rangeOrigin?.lng ?? null;
+    const rangeNm = plan && 'rangeNm' in plan ? plan.rangeNm ?? null : null;
 
     // Optionally filter the globe to the events you can make
     useEffect(() => {
         if (!onMatches) return;
         onMatches(filterMap && open && result ? new Set(result.ok.map((c) => c.event)) : null);
     }, [filterMap, open, result, onMatches]);
+
+    // Range circle on the globe
+    useEffect(() => {
+        if (!onRange) return;
+        onRange(
+            showRange && open && rangeLat != null && rangeLng != null && rangeNm
+                ? { lat: rangeLat, lng: rangeLng, radiusNm: rangeNm }
+                : null
+        );
+    }, [showRange, open, rangeLat, rangeLng, rangeNm, onRange]);
 
     const tweakText = (t: Tweak) => {
         switch (t.kind) {
@@ -209,6 +255,10 @@ export default function PlannerPanel<T extends PlannerEventLike>({
 
     return (
         <div className={styles.wrapper}>
+            {open && isMobile && (
+                <div className={styles.backdrop} onClick={() => onOpenChange(false)} />
+            )}
+
             <div
                 className={`${styles.panel} ${open ? styles.panelOpen : ''}`}
                 role="dialog"
@@ -224,6 +274,7 @@ export default function PlannerPanel<T extends PlannerEventLike>({
 
                 <div className={styles.scroll}>
                     <section className={styles.section}>
+                        <h3 className={styles.sectionTitle}>Landing window</h3>
                         <div className={styles.row}>
                             <label className={styles.field} style={{ flex: '0 0 96px' }}>
                                 <span>From</span>
@@ -234,6 +285,7 @@ export default function PlannerPanel<T extends PlannerEventLike>({
                                     autoCapitalize="characters"
                                     onChange={(e) => setOrigin(e.target.value.toUpperCase())}
                                     className={styles.icao}
+                                    placeholder="ICAO"
                                 />
                             </label>
                             <label className={styles.field}>
@@ -287,10 +339,22 @@ export default function PlannerPanel<T extends PlannerEventLike>({
                     </section>
 
                     <section className={styles.section}>
-                        <label className={styles.checkRow}>
-                            <input type="checkbox" checked={filterMap} onChange={(e) => setFilterMap(e.target.checked)} />
-                            <span>Show only matching events on the globe</span>
-                        </label>
+                        {/* <Switch
+                            checked={filterMap}
+                            onChange={() => setFilterMap((v) => !v)}
+                            label="Filter the globe"
+                            hint="Show only matching events on the map"
+                        /> */}
+                        <Switch
+                            checked={showRange}
+                            onChange={() => setShowRange((v) => !v)}
+                            label="Show range circle"
+                            hint={
+                                rangeNm
+                                    ? `${Math.round(rangeNm).toLocaleString()} nm from ${plan && 'icao' in plan ? plan.icao : 'origin'}`
+                                    : 'How far you can fly before landing by'
+                            }
+                        />
                     </section>
 
                     <section className={styles.results}>
